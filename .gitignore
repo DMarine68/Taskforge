@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+*.local
+
+# Electron
+out/
+release/
+
+# Dependencies
+package-lock.json
+yarn.lock
+
+

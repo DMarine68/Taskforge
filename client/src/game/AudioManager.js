@@ -1,0 +1,165 @@
+export class AudioManager {
+  constructor() {
+    this.audioContext = null;
+    this.sounds = new Map();
+    this.currentMusic = null;
+    this.musicVolume = 0.5;
+    this.sfxVolume = 0.7;
+    this.isMuted = false;
+    this.gameplayMusicTracks = [];
+    this.currentGameplayTrackIndex = 0;
+  }
+
+  init() {
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.warn('Web Audio API not supported');
+    }
+  }
+
+  loadSound(name, path, isMusic = false) {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio(path);
+      audio.loop = isMusic;
+      audio.volume = isMusic ? this.musicVolume : this.sfxVolume;
+      
+      audio.addEventListener('canplaythrough', () => {
+        this.sounds.set(name, audio);
+        resolve(audio);
+      });
+
+      audio.addEventListener('error', (e) => {
+        console.error(`Error loading sound ${name}:`, e);
+        reject(e);
+      });
+
+      audio.load();
+    });
+  }
+
+  playSound(name, volume = null) {
+    const sound = this.sounds.get(name);
+    if (sound) {
+      if (volume !== null) {
+        sound.volume = volume;
+      }
+      sound.currentTime = 0;
+      sound.play().catch(e => {
+        console.warn(`Could not play sound ${name}:`, e);
+      });
+    }
+  }
+
+  playMusic(name, loop = true) {
+    // Stop current music
+    if (this.currentMusic) {
+      this.stopMusic();
+    }
+
+    const music = this.sounds.get(name);
+    if (music) {
+      music.loop = loop;
+      music.volume = this.musicVolume;
+      this.currentMusic = music;
+      music.play().catch(e => {
+        console.warn(`Could not play music ${name}:`, e);
+      });
+    }
+  }
+
+  stopMusic() {
+    if (this.currentMusic) {
+      this.currentMusic.pause();
+      this.currentMusic.currentTime = 0;
+      this.currentMusic = null;
+    }
+  }
+
+  setMusicVolume(volume) {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    if (this.currentMusic) {
+      this.currentMusic.volume = this.musicVolume;
+    }
+  }
+
+  setSFXVolume(volume) {
+    this.sfxVolume = Math.max(0, Math.min(1, volume));
+  }
+
+  setMuted(muted) {
+    this.isMuted = muted;
+    this.sounds.forEach(sound => {
+      sound.muted = muted;
+    });
+  }
+
+  // Shuffle gameplay music
+  loadGameplayMusic(trackNames) {
+    this.gameplayMusicTracks = trackNames;
+    this.currentGameplayTrackIndex = 0;
+  }
+
+  playNextGameplayTrack() {
+    if (this.gameplayMusicTracks.length === 0) return;
+
+    const trackName = this.gameplayMusicTracks[this.currentGameplayTrackIndex];
+    this.playMusic(trackName, false);
+
+    // When track ends, play next
+    const music = this.sounds.get(trackName);
+    if (music) {
+      music.addEventListener('ended', () => {
+        this.currentGameplayTrackIndex = (this.currentGameplayTrackIndex + 1) % this.gameplayMusicTracks.length;
+        this.playNextGameplayTrack();
+      }, { once: true });
+    }
+  }
+
+  // Generate pickup sound effect using Web Audio API
+  playPickupSound() {
+    if (!this.audioContext || this.isMuted) return;
+    
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Create a quick "pluck" sound
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(400, this.audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(this.sfxVolume * 0.3, this.audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.15);
+    
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 0.15);
+  }
+
+  // Generate drop sound effect using Web Audio API
+  playDropSound() {
+    if (!this.audioContext || this.isMuted) return;
+    
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Create a "thud" sound
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(150, this.audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.2);
+    
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(this.sfxVolume * 0.4, this.audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.2);
+    
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 0.2);
+  }
+}
+

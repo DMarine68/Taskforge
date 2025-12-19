@@ -1,0 +1,21 @@
+{
+  "name": "taskforge-automation",
+  "version": "1.0.0",
+  "description": "Taskforge: Automation - An Autonauts-style visual programming game",
+  "main": "client/src/main.js",
+  "scripts": {
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+    "start": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "build:dev": "cd client && npm run build:dev",
+    "server": "cd server && npm start",
+    "dev": "concurrently \"npm run start\" \"npm run server\""
+  },
+  "keywords": ["game", "automation", "programming", "electron"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+
