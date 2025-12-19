@@ -1,6 +1,6 @@
 # Taskforge: Automation
 
-An Autonauts-style visual programming automation game built with Three.js and Electron.
+An Autonauts-style visual programming automation game built with **Three.js** and Electron.
 
 ## Setup
 
@@ -35,6 +35,8 @@ npm run build
 
 ## Development
 
+### Desktop Development (Electron)
+
 For development with hot reload:
 ```bash
 cd client
@@ -47,11 +49,25 @@ cd client
 npm run electron
 ```
 
-## Development
+### Web Development
 
-- Client runs on Electron
-- Server runs separately: `npm run server`
-- Web version: `cd client && npm run web`
+Run the web version in your browser:
+```bash
+cd client
+npm run web
+```
+
+### Server Development
+
+Start the multiplayer server separately:
+```bash
+npm run server
+```
+
+Or run both client and server together:
+```bash
+npm run dev
+```
 
 ## Project Structure
 
@@ -61,8 +77,9 @@ npm run electron
 
 ## Technology Stack
 
-- Three.js for 3D rendering
-- Electron for desktop app
-- Node.js + WebSocket for multiplayer
-- Webpack for bundling
+- **Three.js** (v0.160.0) - 3D rendering engine
+- **Electron** - Desktop application framework
+- **Node.js** + **WebSocket** - Multiplayer server
+- **Webpack** - Module bundling
+- **Babel** - JavaScript transpilation
 
