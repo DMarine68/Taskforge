@@ -2,6 +2,10 @@
 
 An Autonauts-style visual programming automation game built with **Three.js** and Electron.
 
+![Game Screenshot](client/public/images/game-screenshot.png)
+
+![Gameplay Demo](client/public/images/gameplay-demo.gif)
+
 ## Setup
 
 1. Install dependencies:
