@@ -49,7 +49,6 @@ export class SceneManager {
     this.scene.background = new THREE.Color(0x87CEEB); // Sky blue
 
     // Create camera (orthographic for isometric view)
-    // Proper isometric setup using explicit rotations for accurate projection
     const aspect = window.innerWidth / window.innerHeight;
     const viewSize = 30;
     
@@ -62,22 +61,25 @@ export class SceneManager {
       1000
     );
     
-    // Position camera at distance from origin for isometric view
+    // Position camera for isometric view
+    // Isometric angle: 30° elevation, 45° azimuth for balanced view
     const distance = 30;
-    this.camera.position.set(distance, distance, distance);
+    const elevation = Math.PI / 6; // 30 degrees
+    const azimuth = Math.PI / 4; // 45 degrees
     
-    // Set initial zoom to zoom in on the world (higher zoom = closer view)
-    // Default zoom is 1.0, setting to 2.0 to start closer
+    // Calculate camera position using spherical coordinates
+    const x = distance * Math.sin(azimuth) * Math.cos(elevation);
+    const y = distance * Math.sin(elevation);
+    const z = -distance * Math.cos(azimuth) * Math.cos(elevation);
+    
+    this.camera.position.set(x, y, z);
+    
+    // Set initial zoom
     this.camera.zoom = 2.0;
     
-    // Ensure camera up vector is correct
+    // Set up vector and look at origin
     this.camera.up.set(0, 1, 0);
-    
-    // Use explicit rotations for proper isometric projection
-    // This ensures equal foreshortening on all axes
-    this.camera.rotation.order = 'YXZ'; // Important: set rotation order first
-    this.camera.rotation.y = -Math.PI / 4; // Rotate 45° around Y-axis (azimuth)
-    this.camera.rotation.x = Math.atan(1 / Math.sqrt(2)); // 35.264° around X-axis (true isometric elevation)
+    this.camera.lookAt(0, 0, 0);
     
     // Update projection matrix
     this.camera.updateProjectionMatrix();
@@ -197,27 +199,7 @@ export class SceneManager {
     
     // Initial render to ensure scene is visible
     if (this.renderer && this.scene && this.camera) {
-      // Force camera matrix update by temporarily calling lookAt (like rotation does)
-      // This ensures the camera's view matrix is properly computed from explicit rotations
-      // Then restore the explicit rotations
-      const savedRotationOrder = this.camera.rotation.order;
-      const savedRotationY = this.camera.rotation.y;
-      const savedRotationX = this.camera.rotation.x;
-      
-      // This lookAt call forces the matrix to be computed properly
-      this.camera.lookAt(0, 0, 0);
-      
-      // Restore explicit rotations immediately
-      this.camera.rotation.order = savedRotationOrder;
-      this.camera.rotation.y = savedRotationY;
-      this.camera.rotation.x = savedRotationX;
-      
-      // Sync quaternion from explicit rotations
-      this.camera.quaternion.setFromEuler(this.camera.rotation);
-      
-      // Update matrices
-      this.camera.updateMatrix();
-      this.camera.updateMatrixWorld();
+      // Update matrices before first render
       this.scene.updateMatrixWorld(true);
       this.renderer.render(this.scene, this.camera);
     }
