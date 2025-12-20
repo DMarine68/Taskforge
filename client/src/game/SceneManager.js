@@ -48,22 +48,20 @@ export class SceneManager {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87CEEB); // Sky blue
 
-    // Create camera (orthographic for isometric view)
+    // Create camera (perspective for 3D view)
     const aspect = window.innerWidth / window.innerHeight;
-    const viewSize = 30;
+    const fov = 60; // Field of view in degrees
     
-    this.camera = new THREE.OrthographicCamera(
-      -viewSize * aspect,
-      viewSize * aspect,
-      viewSize,
-      -viewSize,
+    this.camera = new THREE.PerspectiveCamera(
+      fov,
+      aspect,
       0.1,
       1000
     );
     
-    // Position camera for isometric view
-    // Isometric angle: 30° elevation, 45° azimuth for balanced view
-    const distance = 30;
+    // Position camera for good initial view
+    // Start with elevated angle looking down at the world
+    const distance = 40;
     const elevation = Math.PI / 6; // 30 degrees
     const azimuth = Math.PI / 4; // 45 degrees
     
@@ -73,9 +71,6 @@ export class SceneManager {
     const z = -distance * Math.cos(azimuth) * Math.cos(elevation);
     
     this.camera.position.set(x, y, z);
-    
-    // Set initial zoom
-    this.camera.zoom = 2.0;
     
     // Set up vector and look at origin
     this.camera.up.set(0, 1, 0);
@@ -101,19 +96,19 @@ export class SceneManager {
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 50;
-    directionalLight.shadow.camera.left = -20;
-    directionalLight.shadow.camera.right = 20;
-    directionalLight.shadow.camera.top = 20;
-    directionalLight.shadow.camera.bottom = -20;
+    directionalLight.shadow.camera.far = 150; // Increased for larger world
+    directionalLight.shadow.camera.left = -50; // Increased for larger world
+    directionalLight.shadow.camera.right = 50;
+    directionalLight.shadow.camera.top = 50;
+    directionalLight.shadow.camera.bottom = -50;
     this.scene.add(directionalLight);
 
-    // Create larger tile grid (50x50 for bigger map)
-    this.tileGrid = new TileGrid(this.scene, 50, 50);
+    // Create larger tile grid (100x100 default)
+    this.tileGrid = new TileGrid(this.scene, 100, 100);
     this.tileGrid.create();
 
     // Create detailed terrain with biomes
-    this.terrain = new Terrain(this.scene, 50, 50);
+    this.terrain = new Terrain(this.scene, 100, 100);
     this.terrain.create();
 
     // Create tile highlighter
@@ -260,12 +255,9 @@ export class SceneManager {
   }
 
   onWindowResize() {
+    // Update perspective camera aspect ratio
     const aspect = window.innerWidth / window.innerHeight;
-    const viewSize = 30;
-    this.camera.left = -viewSize * aspect;
-    this.camera.right = viewSize * aspect;
-    this.camera.top = viewSize;
-    this.camera.bottom = -viewSize;
+    this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }

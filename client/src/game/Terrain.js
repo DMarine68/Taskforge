@@ -6,13 +6,19 @@ export class Terrain {
     this.width = width;
     this.height = height;
     this.tileSize = 1;
+    this.mesh = null;
   }
 
   create() {
     // Create terrain with two biomes: forest (brown) on left, grass (green) on right
     const terrainGroup = new THREE.Group();
     
-    // Create individual tiles for biome blending
+    // Optimize rendering by grouping tiles by biome and using merged geometry
+    const forestTiles = [];
+    const grassTiles = [];
+    const blendTiles = [];
+    
+    // Collect tiles by biome type
     for (let x = 0; x < this.width; x++) {
       for (let z = 0; z < this.height; z++) {
         const worldX = (x - this.width / 2) * this.tileSize;
@@ -25,21 +31,26 @@ export class Terrain {
         const diagonalValue = normalizedX + normalizedZ; // Creates diagonal split
         
         let color;
+        let biomeType;
+        
         if (diagonalValue < 0.8) {
           // Forest biome (brown)
           color = 0x8B7355; // Warm brown
+          biomeType = 'forest';
         } else if (diagonalValue > 1.2) {
           // Grass biome (green)
           color = 0x90EE90; // Light green
+          biomeType = 'grass';
         } else {
           // Blending zone - mix colors
           const blendFactor = (diagonalValue - 0.8) / 0.4; // 0 to 1
           const brown = new THREE.Color(0x8B7355);
           const green = new THREE.Color(0x90EE90);
           color = brown.lerp(green, blendFactor).getHex();
+          biomeType = 'blend';
         }
         
-        // Create tile with checkerboard pattern for grass area
+        // Apply checkerboard pattern for grass area
         const isGrass = diagonalValue > 1.0;
         if (isGrass && (x + z) % 2 === 0) {
           // Alternate checkerboard pattern
@@ -47,23 +58,80 @@ export class Terrain {
           color = lighterGreen.getHex();
         }
         
-        // Create tile
-        const tileGeometry = new THREE.PlaneGeometry(this.tileSize, this.tileSize);
-        const tileMaterial = new THREE.MeshStandardMaterial({ 
-          color: color,
-          roughness: 0.8,
-          metalness: 0.1
-        });
-        const tile = new THREE.Mesh(tileGeometry, tileMaterial);
-        tile.rotation.x = -Math.PI / 2;
-        tile.position.set(worldX, 0, worldZ);
-        tile.receiveShadow = true;
-        terrainGroup.add(tile);
+        // Store tile data for batch creation
+        const tileData = {
+          worldX,
+          worldZ,
+          color,
+          biomeType
+        };
+        
+        if (biomeType === 'forest') {
+          forestTiles.push(tileData);
+        } else if (biomeType === 'grass') {
+          grassTiles.push(tileData);
+        } else {
+          blendTiles.push(tileData);
+        }
       }
     }
     
+    // Create merged geometry for each biome type for better performance
+    this.createMergedTerrain(terrainGroup, forestTiles, 'forest');
+    this.createMergedTerrain(terrainGroup, grassTiles, 'grass');
+    this.createMergedTerrain(terrainGroup, blendTiles, 'blend');
+    
     // Add small decorative flowers on grass tiles
-    for (let i = 0; i < 50; i++) {
+    this.addFlowers(terrainGroup);
+    
+    terrainGroup.position.y = 0;
+    this.scene.add(terrainGroup);
+    this.mesh = terrainGroup;
+  }
+
+  createMergedTerrain(terrainGroup, tiles, biomeType) {
+    if (tiles.length === 0) return;
+    
+    // Group tiles by color to reduce draw calls and material switches
+    const tilesByColor = new Map();
+    tiles.forEach(tile => {
+      if (!tilesByColor.has(tile.color)) {
+        tilesByColor.set(tile.color, []);
+      }
+      tilesByColor.get(tile.color).push(tile);
+    });
+    
+    // Create a single geometry that we'll reuse
+    const tileGeometry = new THREE.PlaneGeometry(this.tileSize, this.tileSize);
+    tileGeometry.rotateX(-Math.PI / 2); // Rotate to lie flat
+    
+    // Create meshes grouped by color for better performance
+    tilesByColor.forEach((colorTiles, color) => {
+      // Create material for this color group
+      const material = new THREE.MeshStandardMaterial({ 
+        color: color,
+        roughness: 0.8,
+        metalness: 0.1
+      });
+      
+      // Create individual meshes for each tile (simple and reliable)
+      // For very large grids, could optimize further with InstancedMesh
+      colorTiles.forEach(tile => {
+        const mesh = new THREE.Mesh(tileGeometry.clone(), material);
+        mesh.position.set(tile.worldX, 0, tile.worldZ);
+        mesh.receiveShadow = true;
+        terrainGroup.add(mesh);
+      });
+    });
+    
+    tileGeometry.dispose();
+  }
+
+  addFlowers(terrainGroup) {
+    // Add small decorative flowers on grass tiles
+    const flowerCount = Math.min(100, Math.floor(this.width * this.height * 0.02)); // 2% of tiles, max 100
+    
+    for (let i = 0; i < flowerCount; i++) {
       const x = Math.random() * this.width;
       const z = Math.random() * this.height;
       const normalizedX = x / this.width;
@@ -85,11 +153,5 @@ export class Terrain {
         terrainGroup.add(flower);
       }
     }
-    
-    terrainGroup.position.y = 0;
-    this.scene.add(terrainGroup);
-    this.mesh = terrainGroup;
   }
 }
-
-

@@ -6,9 +6,12 @@ export class CameraController {
     this.domElement = domElement;
     this.isDragging = false;
     this.previousMousePosition = { x: 0, y: 0 };
-    this.zoomSpeed = 0.1;
+    this.zoomSpeed = 2.0; // Distance units per scroll step
     this.panSpeed = 0.02;
     this.rotateSpeed = 0.005;
+    
+    // Center point for rotation (world origin)
+    this.rotationCenter = new THREE.Vector3(0, 0, 0);
     
     // Track pressed keys for WASD panning
     this.keys = {
@@ -39,13 +42,30 @@ export class CameraController {
   onWheel(event) {
     event.preventDefault();
     const delta = event.deltaY;
-    // Inverted: scroll up zooms in, scroll down zooms out
-    const zoomFactor = delta > 0 ? 1 - this.zoomSpeed : 1 + this.zoomSpeed;
     
-    // Adjust orthographic camera zoom
-    this.camera.zoom *= zoomFactor;
-    this.camera.zoom = Math.max(0.5, Math.min(5, this.camera.zoom));
-    this.camera.updateProjectionMatrix();
+    // For perspective camera, zoom by moving camera closer/farther from rotation center
+    const direction = new THREE.Vector3();
+    this.camera.getWorldDirection(direction);
+    
+    // Calculate current distance from rotation center
+    const currentDistance = this.camera.position.distanceTo(this.rotationCenter);
+    
+    // Zoom in (scroll up) = move closer, zoom out (scroll down) = move farther
+    const zoomDelta = delta > 0 ? this.zoomSpeed : -this.zoomSpeed;
+    const newDistance = Math.max(5, Math.min(100, currentDistance + zoomDelta));
+    
+    // Move camera along the direction vector
+    const directionToCenter = new THREE.Vector3()
+      .subVectors(this.rotationCenter, this.camera.position)
+      .normalize();
+    
+    // Calculate new position maintaining the same direction
+    const newPosition = new THREE.Vector3()
+      .copy(this.rotationCenter)
+      .sub(directionToCenter.multiplyScalar(newDistance));
+    
+    this.camera.position.copy(newPosition);
+    this.camera.lookAt(this.rotationCenter);
   }
 
   onMouseDown(event) {
@@ -69,10 +89,9 @@ export class CameraController {
     if (event.buttons === 4) { // Middle mouse button
       if (event.shiftKey) {
         // Shift + MMB - Rotate camera around center
-        const center = new THREE.Vector3(0, 0, 0);
-        const radius = this.camera.position.distanceTo(center);
+        const radius = this.camera.position.distanceTo(this.rotationCenter);
         const spherical = new THREE.Spherical();
-        spherical.setFromVector3(this.camera.position.clone().sub(center));
+        spherical.setFromVector3(this.camera.position.clone().sub(this.rotationCenter));
         
         spherical.theta -= deltaX * this.rotateSpeed;
         spherical.phi += deltaY * this.rotateSpeed;
@@ -82,17 +101,17 @@ export class CameraController {
         spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1, spherical.phi));
         
         this.camera.position.setFromSpherical(spherical);
-        this.camera.position.add(center);
+        this.camera.position.add(this.rotationCenter);
         
         // Ensure camera Y position is always above ground (Y >= 0)
         if (this.camera.position.y < 0.5) {
           this.camera.position.y = 0.5;
         }
         
-        this.camera.lookAt(center);
+        this.camera.lookAt(this.rotationCenter);
       } else {
         // MMB alone - Pan camera horizontally and vertically (same as WASD)
-        this.panCamera(deltaX, deltaY);
+        this.panCamera(deltaX, deltaY, true, false);
       }
     }
 
@@ -120,30 +139,47 @@ export class CameraController {
     }
   }
 
-  panCamera(deltaX, deltaY, includeVertical = true) {
-    // Calculate pan direction in camera's local space (same as MMB panning)
+  panCamera(deltaX, deltaY, includeVertical = true, isKeyboard = false) {
+    // Calculate pan direction in camera's local space
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.camera.quaternion);
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     const up = new THREE.Vector3(0, 1, 0);
     
     // Pan horizontally (XZ plane)
+    // For mouse: deltaX positive = drag right = pan left (negative right)
+    // For keyboard: panX positive = A key = pan left (negative right)
     const horizontalPanX = right.clone().multiplyScalar(-deltaX * this.panSpeed);
-    const horizontalPanZ = forward.clone().multiplyScalar(-deltaY * this.panSpeed);
+    
+    // For mouse: deltaY positive = drag down = pan forward (positive forward)
+    // For keyboard: panY negative (W) = move forward, so we need to negate deltaY
+    const forwardPan = isKeyboard ? -deltaY : deltaY;
+    const horizontalPanZ = forward.clone().multiplyScalar(forwardPan * this.panSpeed);
     
     // Combine horizontal movements
     this.camera.position.add(horizontalPanX);
     this.camera.position.add(horizontalPanZ);
     
+    // Update rotation center to match camera movement
+    this.rotationCenter.add(horizontalPanX);
+    this.rotationCenter.add(horizontalPanZ);
+    
     // Pan vertically (Y axis) - only if includeVertical is true (for MMB)
     if (includeVertical) {
       const verticalPan = up.clone().multiplyScalar(deltaY * this.panSpeed * 0.5);
       this.camera.position.add(verticalPan);
+      this.rotationCenter.add(verticalPan);
     }
     
-    // Prevent camera from going below ground level
+    // Ensure camera and rotation center stay above ground level
     if (this.camera.position.y < 0.5) {
       this.camera.position.y = 0.5;
     }
+    if (this.rotationCenter.y < 0) {
+      this.rotationCenter.y = 0;
+    }
+    
+    // Update camera look-at after panning
+    this.camera.lookAt(this.rotationCenter);
   }
 
   update(deltaTime) {
@@ -166,19 +202,20 @@ export class CameraController {
       
       // Apply panning - simulate pixel-like movement for smooth WASD
       // Use a speed that feels similar to MMB dragging (pixels per second)
-      // MMB typically moves at ~1-2 pixels per frame, so we simulate that
       const pixelsPerSecond = 60; // Reasonable speed for keyboard input
       const deltaX = panX * pixelsPerSecond * deltaTime;
       const deltaY = panY * pixelsPerSecond * deltaTime;
       
-      // Call panCamera with same signature as MMB (includeVertical = false for horizontal-only panning)
-      this.panCamera(deltaX, deltaY, false);
+      // Call panCamera with keyboard flag (includeVertical = false for horizontal-only panning)
+      this.panCamera(deltaX, deltaY, false, true);
     }
     
     // Constrain camera position to prevent going below terrain
     if (this.camera.position.y < 0.5) {
       this.camera.position.y = 0.5;
     }
+    if (this.rotationCenter.y < 0) {
+      this.rotationCenter.y = 0;
+    }
   }
 }
-
