@@ -1,9 +1,12 @@
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Add any Electron APIs you need here
+  // Quit the application
+  quit: () => {
+    ipcRenderer.send('app-quit');
+  }
 });
 
 
