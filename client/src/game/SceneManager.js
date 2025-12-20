@@ -59,25 +59,8 @@ export class SceneManager {
       1000
     );
     
-    // Position camera for good initial view
-    // Start with elevated angle looking down at the world
-    const distance = 40;
-    const elevation = Math.PI / 6; // 30 degrees
-    const azimuth = Math.PI / 4; // 45 degrees
-    
-    // Calculate camera position using spherical coordinates
-    const x = distance * Math.sin(azimuth) * Math.cos(elevation);
-    const y = distance * Math.sin(elevation);
-    const z = -distance * Math.cos(azimuth) * Math.cos(elevation);
-    
-    this.camera.position.set(x, y, z);
-    
-    // Set up vector and look at origin
-    this.camera.up.set(0, 1, 0);
-    this.camera.lookAt(0, 0, 0);
-    
-    // Update projection matrix
-    this.camera.updateProjectionMatrix();
+    // Camera position will be set by CameraController
+    // (which uses Autonauts-style fixed pitch, yaw rotation system)
 
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
