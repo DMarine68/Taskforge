@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Resource } from './Resource.js';
 import { Pathfinder } from './Pathfinder.js';
+import { getItemType } from './ItemTypeRegistry.js';
 
 export class Player {
   constructor(scene, tileGrid) {
@@ -562,97 +563,22 @@ export class Player {
   }
   
   createHandItemModel(itemType) {
-    // Create actual size item for the hand
-    const scale = 1.0; // Full size items
-    
-    switch (itemType) {
-      case 'wood':
-        const woodGeometry = new THREE.BoxGeometry(0.3 * scale, 0.3 * scale, 0.5 * scale);
-        const woodMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0x8B4513,
-          roughness: 0.7,
-          metalness: 0.2
-        });
-        return new THREE.Mesh(woodGeometry, woodMaterial);
-        
-      case 'stone':
-        const stoneGeometry = new THREE.BoxGeometry(0.4 * scale, 0.3 * scale, 0.4 * scale);
-        const stoneMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0x808080,
-          roughness: 0.7,
-          metalness: 0.2
-        });
-        return new THREE.Mesh(stoneGeometry, stoneMaterial);
-        
-      case 'stick':
-        const stickGroup = new THREE.Group();
-        // 75% bigger sticks
-        const stickBodyGeometry = new THREE.CylinderGeometry(0.0875 * scale, 0.0875 * scale, 1.05 * scale, 6);
-        const stickMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0xD2B48C,
-          roughness: 0.8,
-          metalness: 0.1,
-          flatShading: true
-        });
-        const stickBody = new THREE.Mesh(stickBodyGeometry, stickMaterial);
-        stickBody.rotation.z = Math.PI / 2;
-        stickGroup.add(stickBody);
-        
-        const branchGeometry = new THREE.CylinderGeometry(0.0525 * scale, 0.0525 * scale, 0.35 * scale, 6);
-        const branch = new THREE.Mesh(branchGeometry, stickMaterial);
-        branch.rotation.z = Math.PI / 4;
-        branch.position.set(-0.2625 * scale, 0.14 * scale, 0);
-        stickGroup.add(branch);
-        return stickGroup;
-        
-      case 'axe':
-        const axeGroup = new THREE.Group();
-        const handleGeometry = new THREE.BoxGeometry(0.08 * scale, 0.6 * scale, 0.08 * scale);
-        const handleMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0xD2B48C,
-          roughness: 0.8,
-          metalness: 0.1,
-          flatShading: true
-        });
-        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-        handle.position.set(0, 0.3 * scale, 0);
-        handle.rotation.z = Math.PI / 12;
-        axeGroup.add(handle);
-        
-        const headMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0x808080,
-          roughness: 0.4,
-          metalness: 0.6,
-          flatShading: true
-        });
-        
-        const bladeGeometry = new THREE.BoxGeometry(0.25 * scale, 0.15 * scale, 0.08 * scale);
-        const blade = new THREE.Mesh(bladeGeometry, headMaterial);
-        blade.position.set(0.1 * scale, 0.45 * scale, 0);
-        axeGroup.add(blade);
-        
-        const pollGeometry = new THREE.BoxGeometry(0.12 * scale, 0.12 * scale, 0.12 * scale);
-        const poll = new THREE.Mesh(pollGeometry, headMaterial);
-        poll.position.set(-0.05 * scale, 0.45 * scale, 0);
-        axeGroup.add(poll);
-        
-        const eyeGeometry = new THREE.BoxGeometry(0.1 * scale, 0.15 * scale, 0.1 * scale);
-        const eye = new THREE.Mesh(eyeGeometry, headMaterial);
-        eye.position.set(0, 0.45 * scale, 0);
-        axeGroup.add(eye);
-        
-        axeGroup.rotation.x = Math.PI / 6; // Tilt the axe
-        return axeGroup;
-        
-      default:
-        const defaultGeometry = new THREE.BoxGeometry(0.3 * scale, 0.3 * scale, 0.3 * scale);
-        const defaultMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0xFFFFFF,
-          roughness: 0.7,
-          metalness: 0.2
-        });
-        return new THREE.Mesh(defaultGeometry, defaultMaterial);
+    // Get the item type from the registry
+    const itemTypeObj = getItemType(itemType);
+    if (itemTypeObj) {
+      // Use the item type's getHandModel method
+      return itemTypeObj.getHandModel(1.0);
     }
+    
+    // Fallback for unknown item types
+    const scale = 1.0;
+    const defaultGeometry = new THREE.BoxGeometry(0.3 * scale, 0.3 * scale, 0.3 * scale);
+    const defaultMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xFFFFFF,
+      roughness: 0.7,
+      metalness: 0.2
+    });
+    return new THREE.Mesh(defaultGeometry, defaultMaterial);
   }
   
   updateHandItem() {
