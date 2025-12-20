@@ -48,16 +48,22 @@ export class WorldObject {
 
   canInteract(playerPosition) {
     if (!this.isInteractable) return false;
+    if (!this.tileGrid || !playerPosition) return false;
     
-    // Tile-based distance check
-    const playerTile = this.tileGrid.getTileAtWorldPosition(playerPosition.x, playerPosition.z);
-    if (!playerTile) return false;
-    
-    const dx = this.tileX - playerTile.tileX;
-    const dz = this.tileZ - playerTile.tileZ;
-    const tileDistance = Math.sqrt(dx * dx + dz * dz);
-    
-    return tileDistance <= this.interactionRange;
+    try {
+      // Tile-based distance check
+      const playerTile = this.tileGrid.getTileAtWorldPosition(playerPosition.x, playerPosition.z);
+      if (!playerTile) return false;
+      
+      const dx = this.tileX - playerTile.tileX;
+      const dz = this.tileZ - playerTile.tileZ;
+      const tileDistance = Math.sqrt(dx * dx + dz * dz);
+      
+      return tileDistance <= this.interactionRange;
+    } catch (error) {
+      console.error('Error in canInteract:', error);
+      return false;
+    }
   }
 
   interact(player) {

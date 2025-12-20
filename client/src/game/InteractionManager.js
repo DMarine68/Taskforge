@@ -187,33 +187,77 @@ export class InteractionManager {
         if (clickedBuilding) {
           // Handle storage container withdraw (left click)
           if (clickedBuilding.buildingType === 'storage' && this.player) {
-            const playerPos = this.player.getPosition();
-            if (clickedBuilding.canInteract && clickedBuilding.canInteract(playerPos)) {
-              clickedBuilding.interact(this.player);
-              // Update hand item display
-              if (this.player.updateHandItem) {
-                this.player.updateHandItem();
+            try {
+              const playerPos = this.player.getPosition();
+              if (clickedBuilding.canInteract && clickedBuilding.canInteract(playerPos)) {
+                clickedBuilding.interact(this.player);
+                // Update hand item display
+                if (this.player.updateHandItem) {
+                  this.player.updateHandItem();
+                }
+                return;
+              } else {
+                // Move player to storage container (use tile coordinates)
+                const { tileX, tileZ } = clickedBuilding.getTilePosition();
+                const targetTile = this.sceneManager?.tileGrid?.getTile(tileX, tileZ);
+                
+                // If target tile is occupied, find adjacent walkable tile
+                if (targetTile && (targetTile.occupied || !targetTile.walkable)) {
+                  // Try to find an adjacent walkable tile
+                  const directions = [
+                    { x: 0, z: -1 },   // North
+                    { x: 1, z: 0 },    // East
+                    { x: 0, z: 1 },    // South
+                    { x: -1, z: 0 },   // West
+                    { x: 1, z: -1 },   // Northeast
+                    { x: 1, z: 1 },    // Southeast
+                    { x: -1, z: 1 },   // Southwest
+                    { x: -1, z: -1 }   // Northwest
+                  ];
+                  
+                  let foundAdjacent = false;
+                  for (const dir of directions) {
+                    const adjTile = this.sceneManager?.tileGrid?.getTile(tileX + dir.x, tileZ + dir.z);
+                    if (adjTile && adjTile.walkable && !adjTile.occupied) {
+                      this.player.moveTo(tileX + dir.x, tileZ + dir.z);
+                      foundAdjacent = true;
+                      break;
+                    }
+                  }
+                  
+                  // If no adjacent tile found, just return (can't reach)
+                  if (!foundAdjacent) {
+                    return;
+                  }
+                } else {
+                  // Target tile is walkable, move there
+                  this.player.moveTo(tileX, tileZ);
+                }
+                return;
               }
-              return;
-            } else {
-              // Move player to storage container (use tile coordinates)
-              const { tileX, tileZ } = clickedBuilding.getTilePosition();
-              this.player.moveTo(tileX, tileZ);
+            } catch (error) {
+              console.error('Error handling storage interaction:', error);
+              // Don't freeze the game on error
               return;
             }
           }
           
           // For other buildings, show building UI
           if (this.sceneManager) {
-            if (this.sceneManager.currentBuildingUI) {
-              this.sceneManager.currentBuildingUI.destroy();
+            try {
+              if (this.sceneManager.currentBuildingUI) {
+                this.sceneManager.currentBuildingUI.destroy();
+              }
+              const { BuildingUI } = await import('../ui/BuildingUI.js');
+              this.sceneManager.currentBuildingUI = new BuildingUI(
+                this.sceneManager.container,
+                clickedBuilding
+              );
+              this.sceneManager.currentBuildingUI.show();
+            } catch (error) {
+              console.error('Error showing building UI:', error);
+              // Don't freeze the game on error
             }
-            const { BuildingUI } = await import('../ui/BuildingUI.js');
-            this.sceneManager.currentBuildingUI = new BuildingUI(
-              this.sceneManager.container,
-              clickedBuilding
-            );
-            this.sceneManager.currentBuildingUI.show();
           }
         }
         return;
@@ -251,36 +295,74 @@ export class InteractionManager {
 
       // Only handle object clicks if we found a valid worldObject
       if (clickedObject && this.player) {
-        const playerPos = this.player.getPosition();
-        if (clickedObject.canInteract && clickedObject.canInteract(playerPos)) {
-          // For resources, pick up 1 item at a time
-          if (clickedObject instanceof Resource) {
-            clickedObject.interact(this.player);
-            // Trigger pickup animation
-            if (this.player.triggerPickupAnimation) {
-              this.player.triggerPickupAnimation();
-            }
-            // Update hand item immediately
-            if (this.player.updateHandItem) {
-              this.player.updateHandItem();
-            }
-            // Remove object only if stack is empty
-            if (clickedObject.shouldRemove && clickedObject.shouldRemove()) {
-              this.removeObject(clickedObject);
-              clickedObject.remove();
+        try {
+          const playerPos = this.player.getPosition();
+          if (clickedObject.canInteract && clickedObject.canInteract(playerPos)) {
+            // For resources, pick up 1 item at a time
+            if (clickedObject instanceof Resource) {
+              clickedObject.interact(this.player);
+              // Trigger pickup animation
+              if (this.player.triggerPickupAnimation) {
+                this.player.triggerPickupAnimation();
+              }
+              // Update hand item immediately
+              if (this.player.updateHandItem) {
+                this.player.updateHandItem();
+              }
+              // Remove object only if stack is empty
+              if (clickedObject.shouldRemove && clickedObject.shouldRemove()) {
+                this.removeObject(clickedObject);
+                clickedObject.remove();
+              }
+            } else {
+              // For other objects, use normal interaction
+              clickedObject.interact(this.player);
+              if (clickedObject.shouldRemove && clickedObject.shouldRemove()) {
+                this.removeObject(clickedObject);
+                clickedObject.remove();
+              }
             }
           } else {
-            // For other objects, use normal interaction
-            clickedObject.interact(this.player);
-            if (clickedObject.shouldRemove && clickedObject.shouldRemove()) {
-              this.removeObject(clickedObject);
-              clickedObject.remove();
+            // Move player to object if not in range (use tile coordinates)
+            const { tileX, tileZ } = clickedObject.getTilePosition();
+            const targetTile = this.sceneManager?.tileGrid?.getTile(tileX, tileZ);
+            
+            // If target tile is occupied (e.g., tree), find adjacent walkable tile
+            if (targetTile && (targetTile.occupied || !targetTile.walkable)) {
+              // Try to find an adjacent walkable tile
+              const directions = [
+                { x: 0, z: -1 },   // North
+                { x: 1, z: 0 },    // East
+                { x: 0, z: 1 },    // South
+                { x: -1, z: 0 },   // West
+                { x: 1, z: -1 },   // Northeast
+                { x: 1, z: 1 },    // Southeast
+                { x: -1, z: 1 },   // Southwest
+                { x: -1, z: -1 }   // Northwest
+              ];
+              
+              let foundAdjacent = false;
+              for (const dir of directions) {
+                const adjTile = this.sceneManager?.tileGrid?.getTile(tileX + dir.x, tileZ + dir.z);
+                if (adjTile && adjTile.walkable && !adjTile.occupied) {
+                  this.player.moveTo(tileX + dir.x, tileZ + dir.z);
+                  foundAdjacent = true;
+                  break;
+                }
+              }
+              
+              // If no adjacent tile found, just return (can't reach)
+              if (!foundAdjacent) {
+                return;
+              }
+            } else {
+              // Target tile is walkable, move there
+              this.player.moveTo(tileX, tileZ);
             }
           }
-        } else {
-          // Move player to object if not in range (use tile coordinates)
-          const { tileX, tileZ } = clickedObject.getTilePosition();
-          this.player.moveTo(tileX, tileZ);
+        } catch (error) {
+          console.error('Error handling object interaction:', error);
+          // Don't freeze the game on error
         }
         return; // Only return if we actually handled an object click
       }
