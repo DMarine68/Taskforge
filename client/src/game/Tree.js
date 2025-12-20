@@ -9,6 +9,14 @@ export class Tree extends WorldObject {
     this.maxHealth = 3;
     this.isChopped = false;
     this.sizeVariation = sizeVariation; // 0.7 to 1.3 for size variation
+    
+    // Set tile content
+    const tile = this.tileGrid.getTile(tileX, tileZ);
+    if (tile) {
+      tile.content = 'tree';
+      tile.occupied = true; // Trees block tiles
+    }
+    
     this.create();
   }
 
@@ -141,9 +149,10 @@ export class Tree extends WorldObject {
     }
 
     // Free tile
-    const tile = this.tileGrid.tiles[this.tileX]?.[this.tileZ];
+    const tile = this.tileGrid.getTile(this.tileX, this.tileZ);
     if (tile) {
       tile.occupied = false;
+      tile.content = null; // Clear tile content
     }
 
     // Return resources to spawn (handled by SceneManager)

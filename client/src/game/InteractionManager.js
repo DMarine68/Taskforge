@@ -156,8 +156,8 @@ export class InteractionManager {
       this.raycaster.setFromCamera(this.mouse, this.camera);
       this.raycaster.ray.intersectPlane(plane, intersectionPoint);
 
-      const tileX = Math.floor(intersectionPoint.x / this.sceneManager.tileGrid.tileSize + this.sceneManager.tileGrid.width / 2);
-      const tileZ = Math.floor(intersectionPoint.z / this.sceneManager.tileGrid.tileSize + this.sceneManager.tileGrid.height / 2);
+      // Snap to tile grid
+      const { tileX, tileZ } = this.sceneManager.tileGrid.worldToTile(intersectionPoint.x, intersectionPoint.z);
 
       const building = this.buildingManager.placeBuilding(tileX, tileZ, this.buildingManager.selectedBuildingType);
       if (building) {
@@ -196,8 +196,9 @@ export class InteractionManager {
               }
               return;
             } else {
-              // Move player to storage container
-              this.player.moveTo(clickedBuilding.worldX, clickedBuilding.worldZ);
+              // Move player to storage container (use tile coordinates)
+              const { tileX, tileZ } = clickedBuilding.getTilePosition();
+              this.player.moveTo(tileX, tileZ);
               return;
             }
           }
@@ -277,42 +278,47 @@ export class InteractionManager {
             }
           }
         } else {
-          // Move player to object if not in range
-          this.player.moveTo(clickedObject.worldX, clickedObject.worldZ);
+          // Move player to object if not in range (use tile coordinates)
+          const { tileX, tileZ } = clickedObject.getTilePosition();
+          this.player.moveTo(tileX, tileZ);
         }
         return; // Only return if we actually handled an object click
       }
       // If intersection didn't match a worldObject, fall through to ground movement
     }
 
-    // Otherwise, check if there's a resource on the clicked tile and move to it
+    // Otherwise, move to clicked tile (snap to grid)
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const intersectionPoint = new THREE.Vector3();
     this.raycaster.ray.intersectPlane(plane, intersectionPoint);
 
     if (this.player && this.sceneManager && this.sceneManager.tileGrid) {
+      // Snap to tile grid
+      const { tileX, tileZ } = this.sceneManager.tileGrid.worldToTile(intersectionPoint.x, intersectionPoint.z);
+      
       // Check if there's a resource on this tile
-      const tile = this.sceneManager.tileGrid.getTileAtWorldPosition(intersectionPoint.x, intersectionPoint.z);
+      const tile = this.sceneManager.tileGrid.getTile(tileX, tileZ);
       if (tile) {
         // Find resources on this tile
         const resourceOnTile = this.worldObjects.find(obj => {
           if (obj instanceof Resource || (obj.constructor && obj.constructor.name === 'Resource')) {
-            const objTile = this.sceneManager.tileGrid.getTileAtWorldPosition(obj.worldX, obj.worldZ);
-            return objTile && objTile.x === tile.x && objTile.z === tile.z;
+            const objTilePos = obj.getTilePosition();
+            return objTilePos.tileX === tileX && objTilePos.tileZ === tileZ;
           }
           return false;
         });
 
         if (resourceOnTile) {
-          // Move to the resource's position
-          this.player.moveTo(resourceOnTile.worldX, resourceOnTile.worldZ);
+          // Move to the resource's tile
+          const resourceTilePos = resourceOnTile.getTilePosition();
+          this.player.moveTo(resourceTilePos.tileX, resourceTilePos.tileZ);
         } else {
-          // Just move to the clicked position
-          this.player.moveTo(intersectionPoint.x, intersectionPoint.z);
+          // Move to clicked tile
+          this.player.moveTo(tileX, tileZ);
         }
       } else {
-        // Move to clicked position
-        this.player.moveTo(intersectionPoint.x, intersectionPoint.z);
+        // Fallback: try to move to tile coordinates anyway
+        this.player.moveTo(tileX, tileZ);
       }
     }
   }
@@ -373,8 +379,9 @@ export class InteractionManager {
               return;
             }
           } else {
-            // Move player to storage container
-            this.player.moveTo(clickedBuilding.worldX, clickedBuilding.worldZ);
+            // Move player to storage container (use tile coordinates)
+            const { tileX, tileZ } = clickedBuilding.getTilePosition();
+            this.player.moveTo(tileX, tileZ);
             return;
           }
         }
@@ -386,29 +393,27 @@ export class InteractionManager {
     const intersectionPoint = new THREE.Vector3();
     this.raycaster.ray.intersectPlane(plane, intersectionPoint);
 
-    // Get the tile at the drop location
-    const tile = this.sceneManager?.tileGrid?.getTileAtWorldPosition(intersectionPoint.x, intersectionPoint.z);
+    // Snap to tile grid
+    const { tileX, tileZ } = this.sceneManager?.tileGrid?.worldToTile(intersectionPoint.x, intersectionPoint.z) || { tileX: 0, tileZ: 0 };
+    const tile = this.sceneManager?.tileGrid?.getTile(tileX, tileZ);
     
     if (tile) {
       // Check if player is already on this tile
       const playerTile = this.player.getCurrentTile();
-      const playerPos = this.player.getPosition();
-      const dx = intersectionPoint.x - playerPos.x;
-      const dz = intersectionPoint.z - playerPos.z;
-      const distance = Math.sqrt(dx * dx + dz * dz);
+      const playerTilePos = this.player.getTilePosition();
       
-      if (distance < 0.5) {
-        // Player is close enough, drop immediately
-        this.dropItemAt(intersectionPoint.x, intersectionPoint.z, items[0].type);
+      if (playerTilePos.tileX === tileX && playerTilePos.tileZ === tileZ) {
+        // Player is on the tile, drop immediately
+        this.dropItemAt(tile.worldX, tile.worldZ, items[0].type);
       } else {
         // Player needs to travel to the tile first
         // Store drop action to execute when player arrives
         this.player.pendingDropAction = {
-          x: intersectionPoint.x,
-          z: intersectionPoint.z,
+          x: tile.worldX,
+          z: tile.worldZ,
           itemType: items[0].type
         };
-        this.player.moveTo(intersectionPoint.x, intersectionPoint.z);
+        this.player.moveTo(tileX, tileZ);
       }
     }
   }
@@ -431,13 +436,16 @@ export class InteractionManager {
       this.player.triggerDropAnimation();
     }
     
-    // Check if there's already a resource of this type on this tile
-    const tile = this.sceneManager?.tileGrid?.getTileAtWorldPosition(worldX, worldZ);
+    // Snap to tile grid
+    const { tileX, tileZ } = this.sceneManager?.tileGrid?.worldToTile(worldX, worldZ) || { tileX: 0, tileZ: 0 };
+    const tile = this.sceneManager?.tileGrid?.getTile(tileX, tileZ);
+    
     if (tile) {
+      // Check if there's already a resource of this type on this tile
       const existingResource = this.worldObjects.find(obj => {
         if (obj instanceof Resource && obj.type === itemType) {
-          const objTile = this.sceneManager.tileGrid.getTileAtWorldPosition(obj.worldX, obj.worldZ);
-          return objTile && objTile.x === tile.x && objTile.z === tile.z;
+          const objTilePos = obj.getTilePosition();
+          return objTilePos.tileX === tileX && objTilePos.tileZ === tileZ;
         }
         return false;
       });
@@ -446,9 +454,9 @@ export class InteractionManager {
         // Add to existing stack
         existingResource.addToStack(1);
       } else {
-        // Create new resource
+        // Create new resource at tile center
         if (this.sceneManager) {
-          this.sceneManager.spawnResource(worldX, worldZ, itemType);
+          this.sceneManager.spawnResource(tile.worldX, tile.worldZ, itemType);
         }
       }
     }

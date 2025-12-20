@@ -3,9 +3,8 @@ import { WorldObject } from './WorldObject.js';
 
 export class Resource extends WorldObject {
   constructor(scene, tileGrid, worldX, worldZ, type = 'wood', count = 1) {
-    // Find nearest tile
-    const tileX = Math.floor(worldX / tileGrid.tileSize + tileGrid.width / 2);
-    const tileZ = Math.floor(worldZ / tileGrid.tileSize + tileGrid.height / 2);
+    // Snap to nearest tile
+    const { tileX, tileZ } = tileGrid.worldToTile(worldX, worldZ);
     
     super(scene, tileGrid, tileX, tileZ);
     this.type = type;
@@ -15,9 +14,10 @@ export class Resource extends WorldObject {
     this.interactionRange = 1.2; // Larger range for easier pickup (scaled for tile size 2.0)
     
     // Resources don't block tiles - allow player to walk on them
-    const tile = this.tileGrid.tiles[this.tileX]?.[this.tileZ];
+    const tile = this.tileGrid.getTile(this.tileX, this.tileZ);
     if (tile) {
       tile.occupied = false;
+      tile.content = type; // Set tile content
     }
     
     this.create();

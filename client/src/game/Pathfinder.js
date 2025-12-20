@@ -1,14 +1,15 @@
 // Pathfinding utility class (A* algorithm)
-// This is used by Player and will be used by Villagers
+// Strict tile-based pathfinding - all logic uses tile coordinates
 
 export class Pathfinder {
   constructor(tileGrid) {
     this.tileGrid = tileGrid;
   }
 
-  findPath(startX, startZ, endX, endZ) {
-    const startTile = this.tileGrid.getTileAt(startX, startZ);
-    const endTile = this.tileGrid.getTileAt(endX, endZ);
+  // Find path using tile coordinates
+  findPath(startTileX, startTileZ, endTileX, endTileZ) {
+    const startTile = this.tileGrid.getTile(startTileX, startTileZ);
+    const endTile = this.tileGrid.getTile(endTileX, endTileZ);
     
     if (!startTile || !endTile || !endTile.walkable) {
       return [];
@@ -51,13 +52,15 @@ export class Pathfinder {
       closedSet.push(current);
 
       // Check neighbors
-      const neighbors = this.getNeighbors(current);
+      const neighbors = this.getNeighbors(current.tileX, current.tileZ);
       for (const neighbor of neighbors) {
         if (closedSet.includes(neighbor) || !neighbor.walkable || neighbor.occupied) {
           continue;
         }
 
-        const tentativeGScore = (gScore.get(current) || Infinity) + 1;
+        const currentGScore = gScore.get(current) || Infinity;
+        const moveCost = neighbor.moveCost || 1;
+        const tentativeGScore = currentGScore + moveCost;
         const neighborGScore = gScore.get(neighbor) || Infinity;
         
         if (!openSet.includes(neighbor)) {
@@ -75,26 +78,43 @@ export class Pathfinder {
     return []; // No path found
   }
 
-  getNeighbors(tile) {
+  // Get adjacent tiles (8-directional with proper costs)
+  getNeighbors(tileX, tileZ) {
     const neighbors = [];
     const directions = [
-      { x: 0, z: -1 }, // North
-      { x: 1, z: 0 },  // East
-      { x: 0, z: 1 },  // South
-      { x: -1, z: 0 }, // West
-      { x: 1, z: -1 }, // NE
-      { x: 1, z: 1 },  // SE
-      { x: -1, z: 1 }, // SW
-      { x: -1, z: -1 } // NW
+      { x: 0, z: -1, cost: 1 },   // North
+      { x: 1, z: -1, cost: Math.sqrt(2) }, // Northeast (diagonal)
+      { x: 1, z: 0, cost: 1 },    // East
+      { x: 1, z: 1, cost: Math.sqrt(2) }, // Southeast (diagonal)
+      { x: 0, z: 1, cost: 1 },    // South
+      { x: -1, z: 1, cost: Math.sqrt(2) }, // Southwest (diagonal)
+      { x: -1, z: 0, cost: 1 },   // West
+      { x: -1, z: -1, cost: Math.sqrt(2) } // Northwest (diagonal)
     ];
 
     for (const dir of directions) {
-      const neighborX = tile.x + dir.x;
-      const neighborZ = tile.z + dir.z;
-      if (neighborX >= 0 && neighborX < this.tileGrid.width &&
-          neighborZ >= 0 && neighborZ < this.tileGrid.height) {
-        const neighbor = this.tileGrid.tiles[neighborX][neighborZ];
-        if (neighbor) {
+      const neighborX = tileX + dir.x;
+      const neighborZ = tileZ + dir.z;
+      const neighbor = this.tileGrid.getTile(neighborX, neighborZ);
+      
+      if (neighbor && neighbor.walkable && !neighbor.occupied) {
+        // For diagonal movement, check that both cardinal neighbors are walkable
+        if (dir.cost > 1) {
+          const card1X = tileX + dir.x;
+          const card1Z = tileZ;
+          const card2X = tileX;
+          const card2Z = tileZ + dir.z;
+          
+          const card1 = this.tileGrid.getTile(card1X, card1Z);
+          const card2 = this.tileGrid.getTile(card2X, card2Z);
+          
+          if (card1 && card1.walkable && !card1.occupied &&
+              card2 && card2.walkable && !card2.occupied) {
+            neighbor.moveCost = dir.cost;
+            neighbors.push(neighbor);
+          }
+        } else {
+          neighbor.moveCost = dir.cost;
           neighbors.push(neighbor);
         }
       }
@@ -103,12 +123,11 @@ export class Pathfinder {
     return neighbors;
   }
 
+  // Heuristic function (diagonal distance for 8-directional movement)
   heuristic(a, b) {
-    // Euclidean distance
-    const dx = a.x - b.x;
-    const dz = a.z - b.z;
-    return Math.sqrt(dx * dx + dz * dz);
+    const dx = Math.abs(a.tileX - b.tileX);
+    const dz = Math.abs(a.tileZ - b.tileZ);
+    // Use diagonal distance (optimal for 8-directional movement)
+    return Math.max(dx, dz) + (Math.sqrt(2) - 1) * Math.min(dx, dz);
   }
 }
-
-

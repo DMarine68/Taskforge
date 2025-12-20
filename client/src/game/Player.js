@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Resource } from './Resource.js';
+import { Pathfinder } from './Pathfinder.js';
 
 export class Player {
   constructor(scene, tileGrid) {
@@ -19,6 +20,7 @@ export class Player {
     this.isDropping = false; // Animation state
     this.originalY = 0.3; // Store original Y position
     this.originalBodyRotation = 0; // Store original body rotation
+    this.pathfinder = new Pathfinder(tileGrid); // Tile-based pathfinder
     this.create();
   }
 
@@ -194,19 +196,23 @@ export class Player {
     // Position at center of starting tile
     // Character's legs bottom is at Y=-0.3 (leg center at -0.1, leg height 0.4)
     // To put feet on ground (Y=0), position character group at Y=0.3
-    const startTile = this.tileGrid.getTileAt(0, 0);
+    const startTile = this.tileGrid.getTile(Math.floor(this.tileGrid.width / 2), Math.floor(this.tileGrid.height / 2));
     if (startTile) {
       this.mesh.position.set(startTile.worldX, 0.3, startTile.worldZ);
       this.currentTile = startTile;
     } else {
       this.mesh.position.set(0, 0.3, 0);
+      // Fallback: get tile at origin
+      const { tileX, tileZ } = this.tileGrid.worldToTile(0, 0);
+      this.currentTile = this.tileGrid.getTile(tileX, tileZ);
     }
 
     this.scene.add(this.mesh);
   }
 
-  moveTo(worldX, worldZ) {
-    const targetTile = this.tileGrid.getTileAt(worldX, worldZ);
+  // Move to tile coordinates (strict tile-based movement)
+  moveTo(tileX, tileZ) {
+    const targetTile = this.tileGrid.getTile(tileX, tileZ);
     if (!targetTile || !targetTile.walkable) {
       // Hide destination indicator if invalid target
       if (this.destinationIndicator) {
@@ -215,13 +221,10 @@ export class Player {
       return false;
     }
 
-    this.targetPosition = { x: worldX, z: worldZ };
-    this.path = this.calculatePath(
-      this.currentTile.worldX,
-      this.currentTile.worldZ,
-      worldX,
-      worldZ
-    );
+    const startTileX = this.currentTile ? this.currentTile.tileX : 0;
+    const startTileZ = this.currentTile ? this.currentTile.tileZ : 0;
+    
+    this.path = this.pathfinder.findPath(startTileX, startTileZ, tileX, tileZ);
 
     if (this.path.length > 0) {
       this.isMoving = true;
@@ -239,129 +242,32 @@ export class Player {
     return false;
   }
 
+  // Legacy method for world coordinates - converts to tile coordinates
+  moveToWorld(worldX, worldZ) {
+    const { tileX, tileZ } = this.tileGrid.worldToTile(worldX, worldZ);
+    return this.moveTo(tileX, tileZ);
+  }
+
+  // Legacy calculatePath - kept for backward compatibility but uses Pathfinder
   calculatePath(startX, startZ, endX, endZ) {
-    // Simple A* pathfinding
-    const startTile = this.tileGrid.getTileAt(startX, startZ);
-    const endTile = this.tileGrid.getTileAt(endX, endZ);
+    // Convert world coordinates to tile coordinates
+    const startTile = this.tileGrid.getTileAtWorldPosition(startX, startZ);
+    const endTile = this.tileGrid.getTileAtWorldPosition(endX, endZ);
     
     if (!startTile || !endTile || !endTile.walkable) return [];
-
-    const openSet = [startTile];
-    const closedSet = [];
-    const cameFrom = new Map();
-    const gScore = new Map();
-    const fScore = new Map();
-
-    gScore.set(startTile, 0);
-    fScore.set(startTile, this.heuristic(startTile, endTile));
-
-    while (openSet.length > 0) {
-      // Find node with lowest fScore
-      let current = openSet[0];
-      let currentIndex = 0;
-      for (let i = 1; i < openSet.length; i++) {
-        const score = fScore.get(openSet[i]) || Infinity;
-        const currentScore = fScore.get(current) || Infinity;
-        if (score < currentScore) {
-          current = openSet[i];
-          currentIndex = i;
-        }
-      }
-
-      if (current === endTile) {
-        // Reconstruct path
-        const path = [];
-        let node = endTile;
-        while (node) {
-          path.unshift(node);
-          node = cameFrom.get(node);
-        }
-        return path;
-      }
-
-      openSet.splice(currentIndex, 1);
-      closedSet.push(current);
-
-      // Check neighbors
-      const neighbors = this.getNeighbors(current);
-      for (const neighbor of neighbors) {
-        if (closedSet.includes(neighbor) || !neighbor.walkable || neighbor.occupied) {
-          continue;
-        }
-
-        const currentGScore = gScore.get(current) || Infinity;
-        const moveCost = neighbor.moveCost || 1; // Use move cost (1 for cardinal, 1.414 for diagonal)
-        const tentativeGScore = currentGScore + moveCost;
-        const neighborGScore = gScore.get(neighbor) || Infinity;
-        
-        if (!openSet.includes(neighbor)) {
-          openSet.push(neighbor);
-        } else if (tentativeGScore >= neighborGScore) {
-          continue;
-        }
-
-        cameFrom.set(neighbor, current);
-        gScore.set(neighbor, tentativeGScore);
-        fScore.set(neighbor, tentativeGScore + this.heuristic(neighbor, endTile));
-      }
-    }
-
-    return []; // No path found
+    
+    return this.pathfinder.findPath(startTile.tileX, startTile.tileZ, endTile.tileX, endTile.tileZ);
   }
 
+  // Legacy getNeighbors - now handled by Pathfinder
   getNeighbors(tile) {
-    const neighbors = [];
-    // 8-directional movement (including diagonals for faster paths)
-    const directions = [
-      { x: 0, z: -1, cost: 1 },   // North
-      { x: 1, z: -1, cost: 1.414 }, // Northeast (diagonal)
-      { x: 1, z: 0, cost: 1 },    // East
-      { x: 1, z: 1, cost: 1.414 }, // Southeast (diagonal)
-      { x: 0, z: 1, cost: 1 },    // South
-      { x: -1, z: 1, cost: 1.414 }, // Southwest (diagonal)
-      { x: -1, z: 0, cost: 1 },   // West
-      { x: -1, z: -1, cost: 1.414 } // Northwest (diagonal)
-    ];
-
-    for (const dir of directions) {
-      const neighborX = tile.x + dir.x;
-      const neighborZ = tile.z + dir.z;
-      if (neighborX >= 0 && neighborX < this.tileGrid.width &&
-          neighborZ >= 0 && neighborZ < this.tileGrid.height) {
-        const neighbor = this.tileGrid.tiles[neighborX][neighborZ];
-        if (neighbor && neighbor.walkable && !neighbor.occupied) {
-          // For diagonal movement, check that both adjacent cardinal tiles are walkable
-          if (dir.cost > 1) {
-            // Check the two cardinal directions that form this diagonal
-            const card1X = tile.x + dir.x;
-            const card1Z = tile.z;
-            const card2X = tile.x;
-            const card2Z = tile.z + dir.z;
-            
-            const card1 = this.tileGrid.tiles[card1X]?.[card1Z];
-            const card2 = this.tileGrid.tiles[card2X]?.[card2Z];
-            
-            if (card1 && card1.walkable && !card1.occupied &&
-                card2 && card2.walkable && !card2.occupied) {
-              neighbor.moveCost = dir.cost;
-              neighbors.push(neighbor);
-            }
-          } else {
-            neighbor.moveCost = dir.cost;
-            neighbors.push(neighbor);
-          }
-        }
-      }
-    }
-
-    return neighbors;
+    return this.pathfinder.getNeighbors(tile.tileX, tile.tileZ);
   }
 
+  // Legacy heuristic - now handled by Pathfinder
   heuristic(a, b) {
-    // Euclidean distance for better diagonal pathfinding
-    const dx = Math.abs(a.x - b.x);
-    const dz = Math.abs(a.z - b.z);
-    // Use diagonal distance (optimal for 8-directional movement)
+    const dx = Math.abs(a.tileX - b.tileX);
+    const dz = Math.abs(a.tileZ - b.tileZ);
     return Math.max(dx, dz) + (Math.sqrt(2) - 1) * Math.min(dx, dz);
   }
 
@@ -378,13 +284,18 @@ export class Player {
       const distance = Math.sqrt(dx * dx + dz * dz);
 
       if (distance < 0.1) {
-        // Reached current waypoint
+        // Reached current waypoint - snap to tile center
+        this.mesh.position.x = targetX;
+        this.mesh.position.z = targetZ;
+        this.mesh.position.y = 0.3; // Reset to base position when stopped
+        this.walkAnimationTime = 0; // Reset animation
+        
+        // Update current tile
+        this.currentTile = targetTile;
         this.path.shift();
+        
         if (this.path.length === 0) {
           this.isMoving = false;
-          this.currentTile = targetTile;
-          this.mesh.position.y = 0.3; // Reset to base position when stopped
-          this.walkAnimationTime = 0; // Reset animation
           // Hide destination indicator when reached
           if (this.destinationIndicator) {
             this.destinationIndicator.hide();
@@ -404,16 +315,18 @@ export class Player {
           }
         }
       } else {
-        // Move towards waypoint
+        // Move towards waypoint with visual smoothing
         const moveDistance = this.speed * deltaTime;
         if (moveDistance >= distance) {
+          // Snap to tile center if close enough
           this.mesh.position.x = targetX;
           this.mesh.position.z = targetZ;
           this.mesh.position.y = 0.3; // Base position (feet at Y=0)
+          this.currentTile = targetTile;
           this.path.shift();
+          
           if (this.path.length === 0) {
             this.isMoving = false;
-            this.currentTile = targetTile;
             // Hide destination indicator when reached
             if (this.destinationIndicator) {
               this.destinationIndicator.hide();
@@ -433,6 +346,7 @@ export class Player {
             }
           }
         } else {
+          // Smooth movement between tiles
           this.mesh.position.x += (dx / distance) * moveDistance;
           this.mesh.position.z += (dz / distance) * moveDistance;
           
@@ -775,6 +689,19 @@ export class Player {
     };
   }
 
+  // Get tile coordinates of current position
+  getTilePosition() {
+    if (this.currentTile) {
+      return {
+        tileX: this.currentTile.tileX,
+        tileZ: this.currentTile.tileZ
+      };
+    }
+    // Fallback: convert world position to tile coordinates
+    const { tileX, tileZ } = this.tileGrid.worldToTile(this.mesh.position.x, this.mesh.position.z);
+    return { tileX, tileZ };
+  }
+
   getCurrentTile() {
     return this.currentTile;
   }
@@ -791,17 +718,12 @@ export class Player {
     const resourcesOnTile = sceneManager.worldObjects.filter(obj => {
       // Check if it's a resource using instanceof
       if (obj instanceof Resource) {
-        // Check if resource is on the same tile OR within interaction range
-        const resourceTile = this.tileGrid.getTileAtWorldPosition(obj.worldX, obj.worldZ);
-        const sameTile = resourceTile && resourceTile.x === this.currentTile.x && resourceTile.z === this.currentTile.z;
+        // Check if resource is on the same tile (tile-based interaction)
+        const resourceTilePos = obj.getTilePosition();
+        const sameTile = resourceTilePos.tileX === this.currentTile.tileX && 
+                         resourceTilePos.tileZ === this.currentTile.tileZ;
         
-        // Also check distance for nearby resources
-        const dx = obj.worldX - playerPos.x;
-        const dz = obj.worldZ - playerPos.z;
-        const distance = Math.sqrt(dx * dx + dz * dz);
-        const inRange = distance <= (obj.interactionRange || 1.2);
-        
-        return sameTile || inRange;
+        return sameTile;
       }
       return false;
     });

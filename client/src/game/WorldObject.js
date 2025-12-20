@@ -8,13 +8,22 @@ export class WorldObject {
     this.tileZ = tileZ;
     this.mesh = null;
     this.isInteractable = true;
-    this.interactionRange = 3.0; // Scaled for tile size 2.0 (was 1.5 for tile size 1.0)
+    this.interactionRange = 1.5; // Tile-based interaction range (in tiles)
     
-    const tile = this.tileGrid.tiles[tileX]?.[tileZ];
+    // Get tile and position object at tile center
+    const tile = this.tileGrid.getTile(tileX, tileZ);
     if (tile) {
-      this.worldX = tile.worldX;
+      this.worldX = tile.worldX; // Always use tile center
       this.worldZ = tile.worldZ;
-      tile.occupied = true;
+      // Only mark as occupied if this object blocks the tile
+      // (Resources don't block, trees do)
+      // This will be overridden by subclasses if needed
+      tile.occupied = false;
+    } else {
+      // Fallback: calculate world position
+      const worldPos = this.tileGrid.getWorldPosition(tileX, tileZ);
+      this.worldX = worldPos.x;
+      this.worldZ = worldPos.z;
     }
   }
 
@@ -29,14 +38,26 @@ export class WorldObject {
     };
   }
 
+  // Get tile coordinates
+  getTilePosition() {
+    return {
+      tileX: this.tileX,
+      tileZ: this.tileZ
+    };
+  }
+
   canInteract(playerPosition) {
     if (!this.isInteractable) return false;
     
-    const dx = this.worldX - playerPosition.x;
-    const dz = this.worldZ - playerPosition.z;
-    const distance = Math.sqrt(dx * dx + dz * dz);
+    // Tile-based distance check
+    const playerTile = this.tileGrid.getTileAtWorldPosition(playerPosition.x, playerPosition.z);
+    if (!playerTile) return false;
     
-    return distance <= this.interactionRange;
+    const dx = this.tileX - playerTile.tileX;
+    const dz = this.tileZ - playerTile.tileZ;
+    const tileDistance = Math.sqrt(dx * dx + dz * dz);
+    
+    return tileDistance <= this.interactionRange;
   }
 
   interact(player) {
@@ -47,11 +68,10 @@ export class WorldObject {
     if (this.mesh) {
       this.scene.remove(this.mesh);
     }
-    const tile = this.tileGrid.tiles[this.tileX]?.[this.tileZ];
+    const tile = this.tileGrid.getTile(this.tileX, this.tileZ);
     if (tile) {
       tile.occupied = false;
+      tile.content = null; // Clear tile content
     }
   }
 }
-
-

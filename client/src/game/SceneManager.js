@@ -91,7 +91,7 @@ export class SceneManager {
     this.tileGrid.create();
 
     // Create detailed terrain with biomes
-    this.terrain = new Terrain(this.scene, 100, 100);
+    this.terrain = new Terrain(this.scene, this.tileGrid, 100, 100);
     this.terrain.create();
 
     // Create tile highlighter
@@ -156,19 +156,22 @@ export class SceneManager {
           const result = originalChop();
           if (result && result.type) {
             // Spawn resources on tiles around tree position (resources will be centered on their tiles)
-            const treeTile = this.tileGrid.getTileAtWorldPosition(obj.worldX, obj.worldZ);
-            if (treeTile) {
+            const treeTilePos = obj.getTilePosition();
+            if (treeTilePos) {
               for (let i = 0; i < result.count; i++) {
                 // Find a nearby tile (within 1 tile radius)
                 const offsetX = Math.floor((Math.random() - 0.5) * 3); // -1, 0, or 1
                 const offsetZ = Math.floor((Math.random() - 0.5) * 3); // -1, 0, or 1
-                const nearbyTile = this.tileGrid.getTile(treeTile.x + offsetX, treeTile.z + offsetZ);
+                const nearbyTile = this.tileGrid.getTile(treeTilePos.tileX + offsetX, treeTilePos.tileZ + offsetZ);
                 if (nearbyTile && nearbyTile.walkable) {
                   // Spawn at tile center - Resource constructor will center it on the tile
                   this.spawnResource(nearbyTile.worldX, nearbyTile.worldZ, result.type);
                 } else {
                   // Fallback to tree's tile if nearby tile is invalid
-                  this.spawnResource(treeTile.worldX, treeTile.worldZ, result.type);
+                  const treeTile = this.tileGrid.getTile(treeTilePos.tileX, treeTilePos.tileZ);
+                  if (treeTile) {
+                    this.spawnResource(treeTile.worldX, treeTile.worldZ, result.type);
+                  }
                 }
               }
             }
@@ -209,7 +212,7 @@ export class SceneManager {
     for (let i = 0; i < attempts && spawned < count; i++) {
       const tileX = Math.floor(Math.random() * this.tileGrid.width);
       const tileZ = Math.floor(Math.random() * this.tileGrid.height);
-      const tile = this.tileGrid.tiles[tileX]?.[tileZ];
+      const tile = this.tileGrid.getTile(tileX, tileZ);
 
       if (tile && tile.walkable && !tile.occupied) {
         // Prefer forest side (left side of map)
@@ -245,7 +248,7 @@ export class SceneManager {
     for (let i = 0; i < attempts && spawned < count; i++) {
       const tileX = Math.floor(Math.random() * this.tileGrid.width);
       const tileZ = Math.floor(Math.random() * this.tileGrid.height);
-      const tile = this.tileGrid.tiles[tileX]?.[tileZ];
+      const tile = this.tileGrid.getTile(tileX, tileZ);
 
       if (tile && tile.walkable && !tile.occupied) {
         // Spawn sticks anywhere on the map
