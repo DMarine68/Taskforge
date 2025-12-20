@@ -10,7 +10,8 @@ export class Player {
     this.currentTile = null;
     this.targetPosition = null;
     this.path = [];
-    this.speed = 6.0; // Increased movement speed
+    this.baseSpeed = 6.0; // Base movement speed
+    this.speed = 6.0; // Current movement speed (can be modified by carrying items)
     this.walkAnimationTime = 0; // For walk animation
     this.pendingDropAction = null; // Store drop action when traveling to drop location
     this.isMoving = false;
@@ -272,6 +273,14 @@ export class Player {
   }
 
   update(deltaTime) {
+    // Update movement speed based on what player is carrying
+    // Logs slow down movement significantly
+    if (this.inventory && this.inventory.hasItem('wood')) {
+      this.speed = this.baseSpeed * 0.5; // 50% speed when carrying a log
+    } else {
+      this.speed = this.baseSpeed; // Normal speed
+    }
+    
     if (this.path.length > 0 && this.isMoving) {
       const targetTile = this.path[0];
       const targetX = targetTile.worldX;
@@ -562,21 +571,92 @@ export class Player {
   }
   
   createHandItemModel(itemType) {
-    // Create actual size item for the hand
-    const scale = 1.0; // Full size items
+    // Create full-size items for the hand (same size as when on ground)
+    const scale = 1.0; // Full size items - no scaling
     
     switch (itemType) {
       case 'wood':
-        const woodGeometry = new THREE.BoxGeometry(0.3 * scale, 0.3 * scale, 0.5 * scale);
-        const woodMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0x8B4513,
-          roughness: 0.7,
-          metalness: 0.2
+        // Create full-size log for the hand (matching the Resource design exactly)
+        const logGroup = new THREE.Group();
+        const logLength = 2.3; // Full size - slightly longer than tile size (2.0)
+        const logRadius = 0.25; // Full size radius
+        
+        // Log body - faceted cylinder (octagonal, 8 sides)
+        const logBodyGeometry = new THREE.CylinderGeometry(logRadius, logRadius, logLength, 8);
+        const logBodyMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0x8B6F47, // Medium desaturated brown
+          roughness: 0.9,
+          metalness: 0.1,
+          flatShading: true
         });
-        return new THREE.Mesh(woodGeometry, woodMaterial);
+        const logBody = new THREE.Mesh(logBodyGeometry, logBodyMaterial);
+        logBody.rotation.z = Math.PI / 2; // Rotate to be horizontal
+        logGroup.add(logBody);
+        
+        // End caps (beige)
+        const endCapMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0xD4C4A8, // Light beige/grayish-tan
+          roughness: 0.8,
+          metalness: 0.1,
+          flatShading: true
+        });
+        
+        // Front end cap
+        const frontEndCapGeometry = new THREE.CylinderGeometry(logRadius, logRadius, 0.05, 8);
+        const frontEndCap = new THREE.Mesh(frontEndCapGeometry, endCapMaterial);
+        frontEndCap.rotation.z = Math.PI / 2;
+        frontEndCap.position.set(logLength / 2, 0, 0);
+        logGroup.add(frontEndCap);
+        
+        // Back end cap
+        const backEndCapGeometry = new THREE.CylinderGeometry(logRadius, logRadius, 0.05, 8);
+        const backEndCap = new THREE.Mesh(backEndCapGeometry, endCapMaterial);
+        backEndCap.rotation.z = Math.PI / 2;
+        backEndCap.position.set(-logLength / 2, 0, 0);
+        logGroup.add(backEndCap);
+        
+        // Add concentric rings on end caps
+        const ringMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0xC4B498, // Slightly darker beige for rings
+          roughness: 0.8,
+          metalness: 0.1,
+          flatShading: true
+        });
+        
+        // Front end rings
+        for (let i = 1; i <= 2; i++) {
+          const ringRadius = logRadius * (1 - i * 0.3);
+          if (ringRadius > 0.05) {
+            const ringGeometry = new THREE.RingGeometry(ringRadius * 0.7, ringRadius, 8);
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.set(logLength / 2 + 0.026, 0, 0);
+            logGroup.add(ring);
+          }
+        }
+        
+        // Back end rings
+        for (let i = 1; i <= 2; i++) {
+          const ringRadius = logRadius * (1 - i * 0.3);
+          if (ringRadius > 0.05) {
+            const ringGeometry = new THREE.RingGeometry(ringRadius * 0.7, ringRadius, 8);
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.set(-logLength / 2 - 0.026, 0, 0);
+            logGroup.add(ring);
+          }
+        }
+        
+        // Rotate log to be held horizontally (perpendicular to player, for 2-hand carry)
+        // Log body is already horizontal (pointing along X axis from rotation.z = Math.PI/2)
+        // Just rotate around Y to make it perpendicular to player (pointing along Z axis)
+        logGroup.rotation.y = Math.PI / 2;
+        
+        return logGroup;
         
       case 'stone':
-        const stoneGeometry = new THREE.BoxGeometry(0.4 * scale, 0.3 * scale, 0.4 * scale);
+        // Full size stone
+        const stoneGeometry = new THREE.BoxGeometry(0.4, 0.3, 0.4);
         const stoneMaterial = new THREE.MeshStandardMaterial({ 
           color: 0x808080,
           roughness: 0.7,
@@ -585,9 +665,9 @@ export class Player {
         return new THREE.Mesh(stoneGeometry, stoneMaterial);
         
       case 'stick':
+        // Full size stick (matching Resource design)
         const stickGroup = new THREE.Group();
-        // 75% bigger sticks
-        const stickBodyGeometry = new THREE.CylinderGeometry(0.0875 * scale, 0.0875 * scale, 1.05 * scale, 6);
+        const stickBodyGeometry = new THREE.CylinderGeometry(0.0875, 0.0875, 1.05, 6);
         const stickMaterial = new THREE.MeshStandardMaterial({ 
           color: 0xD2B48C,
           roughness: 0.8,
@@ -598,16 +678,17 @@ export class Player {
         stickBody.rotation.z = Math.PI / 2;
         stickGroup.add(stickBody);
         
-        const branchGeometry = new THREE.CylinderGeometry(0.0525 * scale, 0.0525 * scale, 0.35 * scale, 6);
+        const branchGeometry = new THREE.CylinderGeometry(0.0525, 0.0525, 0.35, 6);
         const branch = new THREE.Mesh(branchGeometry, stickMaterial);
         branch.rotation.z = Math.PI / 4;
-        branch.position.set(-0.2625 * scale, 0.14 * scale, 0);
+        branch.position.set(-0.2625, 0.14, 0);
         stickGroup.add(branch);
         return stickGroup;
         
       case 'axe':
+        // Full size axe (matching Resource design)
         const axeGroup = new THREE.Group();
-        const handleGeometry = new THREE.BoxGeometry(0.08 * scale, 0.6 * scale, 0.08 * scale);
+        const handleGeometry = new THREE.BoxGeometry(0.08, 0.6, 0.08);
         const handleMaterial = new THREE.MeshStandardMaterial({ 
           color: 0xD2B48C,
           roughness: 0.8,
@@ -615,7 +696,7 @@ export class Player {
           flatShading: true
         });
         const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-        handle.position.set(0, 0.3 * scale, 0);
+        handle.position.set(0, 0.3, 0);
         handle.rotation.z = Math.PI / 12;
         axeGroup.add(handle);
         
@@ -626,26 +707,27 @@ export class Player {
           flatShading: true
         });
         
-        const bladeGeometry = new THREE.BoxGeometry(0.25 * scale, 0.15 * scale, 0.08 * scale);
+        const bladeGeometry = new THREE.BoxGeometry(0.25, 0.15, 0.08);
         const blade = new THREE.Mesh(bladeGeometry, headMaterial);
-        blade.position.set(0.1 * scale, 0.45 * scale, 0);
+        blade.position.set(0.1, 0.45, 0);
         axeGroup.add(blade);
         
-        const pollGeometry = new THREE.BoxGeometry(0.12 * scale, 0.12 * scale, 0.12 * scale);
+        const pollGeometry = new THREE.BoxGeometry(0.12, 0.12, 0.12);
         const poll = new THREE.Mesh(pollGeometry, headMaterial);
-        poll.position.set(-0.05 * scale, 0.45 * scale, 0);
+        poll.position.set(-0.05, 0.45, 0);
         axeGroup.add(poll);
         
-        const eyeGeometry = new THREE.BoxGeometry(0.1 * scale, 0.15 * scale, 0.1 * scale);
+        const eyeGeometry = new THREE.BoxGeometry(0.1, 0.15, 0.1);
         const eye = new THREE.Mesh(eyeGeometry, headMaterial);
-        eye.position.set(0, 0.45 * scale, 0);
+        eye.position.set(0, 0.45, 0);
         axeGroup.add(eye);
         
         axeGroup.rotation.x = Math.PI / 6; // Tilt the axe
         return axeGroup;
         
       default:
-        const defaultGeometry = new THREE.BoxGeometry(0.3 * scale, 0.3 * scale, 0.3 * scale);
+        // Full size default item
+        const defaultGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
         const defaultMaterial = new THREE.MeshStandardMaterial({ 
           color: 0xFFFFFF,
           roughness: 0.7,
@@ -663,10 +745,23 @@ export class Player {
       this.handItemGroup.remove(this.handItemGroup.children[0]);
     }
     
-    // Get the selected slot item
-    const selectedSlotItem = this.inventory.getSelectedSlot();
-    if (selectedSlotItem && selectedSlotItem.type) {
-      const itemType = selectedSlotItem.type;
+    // Resources take priority over tools - check for resources first (slots 3-6)
+    let itemToShow = null;
+    for (let slot = 3; slot <= 6; slot++) {
+      const itemSlot = this.inventory.getItemSlot(slot);
+      if (itemSlot && itemSlot.type) {
+        itemToShow = itemSlot;
+        break; // Found first resource, use it
+      }
+    }
+    
+    // If no resource found, check selected slot (which might be a tool)
+    if (!itemToShow) {
+      itemToShow = this.inventory.getSelectedSlot();
+    }
+    
+    if (itemToShow && itemToShow.type) {
+      const itemType = itemToShow.type;
       const handItemMesh = this.createHandItemModel(itemType);
       if (handItemMesh) {
         handItemMesh.castShadow = true;
@@ -674,9 +769,18 @@ export class Player {
         this.handItemGroup.add(handItemMesh);
         this.handItemGroup.visible = true;
         this.currentHandItem = itemType;
+        
+        // Position hand item based on type
+        // Logs are held with 2 hands (centered between hands, in front of player)
+        if (itemType === 'wood') {
+          this.handItemGroup.position.set(0, 0.4, 0.4); // Centered X, same Y height, forward Z
+        } else {
+          // Other items held in right hand
+          this.handItemGroup.position.set(0.4, 0.4, 0.1);
+        }
       }
     } else {
-      // No item in selected slot, hide hand item
+      // No item to show, hide hand item
       this.handItemGroup.visible = false;
       this.currentHandItem = null;
     }

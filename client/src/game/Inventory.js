@@ -71,6 +71,11 @@ export class Inventory {
       return false; // Tools must be manually assigned to tool slots
     }
 
+    // Special case: logs (wood) - can only carry 1 at a time
+    if (itemType === 'wood' && this.hasItem('wood')) {
+      return false; // Already carrying a log
+    }
+
     // Check if inventory already has items - if so, only allow same type
     const existingItemType = this.getFirstItemType();
     if (existingItemType !== null && existingItemType !== itemType) {
@@ -112,6 +117,12 @@ export class Inventory {
       }
       return false; // Tool slots full
     } else {
+      // Special case: logs (wood) - can only carry 1 at a time
+      if (itemType === 'wood') {
+        if (this.hasItem('wood')) {
+          return false; // Already carrying a log
+        }
+      }
       return this.addItemToSlot(itemType, count);
     }
   }

@@ -156,7 +156,8 @@ export class Tree extends WorldObject {
     }
 
     // Return resources to spawn (handled by SceneManager)
-    return { type: 'wood', count: 2 + Math.floor(Math.random() * 2) };
+    // Trees only drop 1 log
+    return { type: 'wood', count: 1 };
   }
 }
 
