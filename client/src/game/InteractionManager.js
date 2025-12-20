@@ -171,96 +171,163 @@ export class InteractionManager {
     this.raycaster.setFromCamera(this.mouse, this.camera);
     
     // Check for building clicks first
-    if (this.buildingManager) {
-      const buildingMeshes = this.buildingManager.buildings.map(b => b.mesh).filter(m => m !== null);
-      const buildingIntersects = this.raycaster.intersectObjects(buildingMeshes);
-      
-      if (buildingIntersects.length > 0) {
-        const clickedBuilding = this.buildingManager.buildings.find(b => {
-          // Check if the clicked mesh belongs to this building (handle groups)
-          if (b.mesh instanceof THREE.Group) {
-            return b.mesh.children.includes(buildingIntersects[0].object) || b.mesh === buildingIntersects[0].object;
-          }
-          return b.mesh === buildingIntersects[0].object;
-        });
-        
-        if (clickedBuilding) {
-          // Handle storage container withdraw (left click)
-          if (clickedBuilding.buildingType === 'storage' && this.player) {
-            try {
-              const playerPos = this.player.getPosition();
-              if (clickedBuilding.canInteract && clickedBuilding.canInteract(playerPos)) {
-                clickedBuilding.interact(this.player);
-                // Update hand item display
-                if (this.player.updateHandItem) {
-                  this.player.updateHandItem();
+    if (this.buildingManager && this.buildingManager.buildings) {
+      try {
+        const buildingMeshes = this.buildingManager.buildings.map(b => b.mesh).filter(m => m !== null);
+        if (buildingMeshes.length === 0) {
+          // No buildings to check, continue to other checks
+        } else {
+          const buildingIntersects = this.raycaster.intersectObjects(buildingMeshes, true); // true = recursive for groups
+          
+          if (buildingIntersects.length > 0) {
+            const clickedMesh = buildingIntersects[0].object;
+            let clickedBuilding = null;
+            
+            // Find which building this mesh belongs to (handle groups recursively)
+            for (const building of this.buildingManager.buildings) {
+              if (!building.mesh) continue;
+              
+              if (building.mesh === clickedMesh) {
+                clickedBuilding = building;
+                break;
+              }
+              
+              if (building.mesh instanceof THREE.Group) {
+                // Check if clicked mesh is a child of this group (recursively)
+                const isChild = this.isMeshInGroup(clickedMesh, building.mesh);
+                if (isChild) {
+                  clickedBuilding = building;
+                  break;
                 }
-                return;
-              } else {
-                // Move player to storage container (use tile coordinates)
-                const { tileX, tileZ } = clickedBuilding.getTilePosition();
-                const targetTile = this.sceneManager?.tileGrid?.getTile(tileX, tileZ);
-                
-                // If target tile is occupied, find adjacent walkable tile
-                if (targetTile && (targetTile.occupied || !targetTile.walkable)) {
-                  // Try to find an adjacent walkable tile
-                  const directions = [
-                    { x: 0, z: -1 },   // North
-                    { x: 1, z: 0 },    // East
-                    { x: 0, z: 1 },    // South
-                    { x: -1, z: 0 },   // West
-                    { x: 1, z: -1 },   // Northeast
-                    { x: 1, z: 1 },    // Southeast
-                    { x: -1, z: 1 },   // Southwest
-                    { x: -1, z: -1 }   // Northwest
-                  ];
+              }
+            }
+            
+            if (clickedBuilding) {
+              // Handle storage container withdraw (left click)
+              if (clickedBuilding.buildingType === 'storage' && this.player) {
+                try {
+                  if (!this.player.getPosition) {
+                    return; // Player doesn't have getPosition method
+                  }
                   
-                  let foundAdjacent = false;
-                  for (const dir of directions) {
-                    const adjTile = this.sceneManager?.tileGrid?.getTile(tileX + dir.x, tileZ + dir.z);
-                    if (adjTile && adjTile.walkable && !adjTile.occupied) {
-                      this.player.moveTo(tileX + dir.x, tileZ + dir.z);
-                      foundAdjacent = true;
-                      break;
+                  const playerPos = this.player.getPosition();
+                  if (!playerPos) {
+                    return; // Invalid player position
+                  }
+                  
+                  // Check if can interact
+                  let canInteract = false;
+                  if (clickedBuilding.canInteract && typeof clickedBuilding.canInteract === 'function') {
+                    try {
+                      canInteract = clickedBuilding.canInteract(playerPos);
+                    } catch (err) {
+                      console.error('Error in canInteract:', err);
+                      canInteract = false;
                     }
                   }
                   
-                  // If no adjacent tile found, just return (can't reach)
-                  if (!foundAdjacent) {
+                  if (canInteract) {
+                    // Player is in range, interact
+                    if (clickedBuilding.interact && typeof clickedBuilding.interact === 'function') {
+                      try {
+                        clickedBuilding.interact(this.player);
+                      } catch (err) {
+                        console.error('Error in interact:', err);
+                      }
+                    }
+                    // Update hand item display
+                    if (this.player.updateHandItem && typeof this.player.updateHandItem === 'function') {
+                      try {
+                        this.player.updateHandItem();
+                      } catch (err) {
+                        console.error('Error updating hand item:', err);
+                      }
+                    }
+                    return;
+                  } else {
+                    // Move player to storage container (use tile coordinates)
+                    try {
+                      const tilePos = clickedBuilding.getTilePosition();
+                      if (!tilePos) {
+                        return; // Invalid tile position
+                      }
+                      
+                      const { tileX, tileZ } = tilePos;
+                      const targetTile = this.sceneManager?.tileGrid?.getTile(tileX, tileZ);
+                      
+                      // If target tile is occupied, find adjacent walkable tile
+                      if (targetTile && (targetTile.occupied || !targetTile.walkable)) {
+                        // Try to find an adjacent walkable tile
+                        const directions = [
+                          { x: 0, z: -1 },   // North
+                          { x: 1, z: 0 },    // East
+                          { x: 0, z: 1 },    // South
+                          { x: -1, z: 0 },   // West
+                          { x: 1, z: -1 },   // Northeast
+                          { x: 1, z: 1 },    // Southeast
+                          { x: -1, z: 1 },   // Southwest
+                          { x: -1, z: -1 }   // Northwest
+                        ];
+                        
+                        let foundAdjacent = false;
+                        for (const dir of directions) {
+                          const adjTile = this.sceneManager?.tileGrid?.getTile(tileX + dir.x, tileZ + dir.z);
+                          if (adjTile && adjTile.walkable && !adjTile.occupied) {
+                            if (this.player.moveTo && typeof this.player.moveTo === 'function') {
+                              this.player.moveTo(tileX + dir.x, tileZ + dir.z);
+                            }
+                            foundAdjacent = true;
+                            break;
+                          }
+                        }
+                        
+                        // If no adjacent tile found, just return (can't reach)
+                        if (!foundAdjacent) {
+                          return;
+                        }
+                      } else {
+                        // Target tile is walkable, move there
+                        if (this.player.moveTo && typeof this.player.moveTo === 'function') {
+                          this.player.moveTo(tileX, tileZ);
+                        }
+                      }
+                    } catch (err) {
+                      console.error('Error moving to storage:', err);
+                    }
                     return;
                   }
-                } else {
-                  // Target tile is walkable, move there
-                  this.player.moveTo(tileX, tileZ);
+                } catch (error) {
+                  console.error('Error handling storage interaction:', error);
+                  // Don't freeze the game on error
+                  return;
                 }
-                return;
+              } else {
+                // For other buildings, show building UI
+                if (this.sceneManager) {
+                  try {
+                    if (this.sceneManager.currentBuildingUI) {
+                      this.sceneManager.currentBuildingUI.destroy();
+                    }
+                    const { BuildingUI } = await import('../ui/BuildingUI.js');
+                    this.sceneManager.currentBuildingUI = new BuildingUI(
+                      this.sceneManager.container,
+                      clickedBuilding
+                    );
+                    this.sceneManager.currentBuildingUI.show();
+                  } catch (error) {
+                    console.error('Error showing building UI:', error);
+                    // Don't freeze the game on error
+                  }
+                }
               }
-            } catch (error) {
-              console.error('Error handling storage interaction:', error);
-              // Don't freeze the game on error
-              return;
             }
-          }
-          
-          // For other buildings, show building UI
-          if (this.sceneManager) {
-            try {
-              if (this.sceneManager.currentBuildingUI) {
-                this.sceneManager.currentBuildingUI.destroy();
-              }
-              const { BuildingUI } = await import('../ui/BuildingUI.js');
-              this.sceneManager.currentBuildingUI = new BuildingUI(
-                this.sceneManager.container,
-                clickedBuilding
-              );
-              this.sceneManager.currentBuildingUI.show();
-            } catch (error) {
-              console.error('Error showing building UI:', error);
-              // Don't freeze the game on error
-            }
+            // If we found and handled a building, we already returned above
+            // If clickedBuilding is null, continue to other checks
           }
         }
-        return;
+      } catch (err) {
+        console.error('Error in building click detection:', err);
+        // Continue to other checks if building detection fails
       }
     }
     
@@ -414,6 +481,21 @@ export class InteractionManager {
     if (index > -1) {
       this.worldObjects.splice(index, 1);
     }
+  }
+
+  // Helper method to recursively check if a mesh is in a group
+  isMeshInGroup(mesh, group) {
+    if (!group || !mesh) return false;
+    if (group === mesh) return true;
+    if (group instanceof THREE.Group) {
+      for (const child of group.children) {
+        if (child === mesh) return true;
+        if (child instanceof THREE.Group) {
+          if (this.isMeshInGroup(mesh, child)) return true;
+        }
+      }
+    }
+    return false;
   }
 
   onRightClick(event) {
