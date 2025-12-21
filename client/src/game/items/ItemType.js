@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadModel } from '../models/ModelLoader.js';
 
 /**
  * Base class for all item types in the game.
@@ -9,6 +10,9 @@ export class ItemType {
   // Positioning constants (in world units, where Y=0 is ground level)
   static DEFAULT_WORLD_Y_POSITION = 0.15; // Default height above ground for most items
   static STICK_WORLD_Y_POSITION = 0.0875;  // Lower height for sticks to sit on ground
+  
+  // Cache for loaded models (populated after preload)
+  static _modelCache = new Map();
   
   constructor(id, name) {
     this.id = id;
@@ -27,11 +31,78 @@ export class ItemType {
 
   /**
    * Creates a model for when the item is placed in the world.
+   * Loads from pre-compiled models for better performance.
+   * Subclasses should implement _buildWorldModel() instead of overriding this.
    * @returns {THREE.Object3D} The 3D model for the world
    */
   getWorldModel() {
-    // Override in subclasses
-    throw new Error(`getWorldModel() not implemented for ${this.id}`);
+    // Try to load from compiled model cache first
+    const cached = ItemType._modelCache.get(this.id);
+    if (cached) {
+      // Clone the cached model
+      return this._cloneModel(cached);
+    }
+    
+    // Fallback: call subclass build method (for compilation script and development)
+    if (this._buildWorldModel && typeof this._buildWorldModel === 'function') {
+      return this._buildWorldModel();
+    }
+    
+    // Final fallback: throw error
+    throw new Error(`Model not found for ${this.id} and no build method available. Make sure models are compiled or implement _buildWorldModel().`);
+  }
+  
+  /**
+   * Builds the world model (override in subclasses).
+   * This method is used by the compilation script and as a fallback.
+   * @protected
+   * @returns {THREE.Object3D} The 3D model for the world
+   */
+  _buildWorldModel() {
+    throw new Error(`_buildWorldModel() not implemented for ${this.id}`);
+  }
+  
+  /**
+   * Clone a THREE.js model (deep clone to avoid sharing geometries/materials)
+   * @private
+   */
+  _cloneModel(model) {
+    const loader = new THREE.ObjectLoader();
+    const json = model.toJSON();
+    const cloned = loader.parse(json);
+    // Ensure shadow properties are preserved
+    cloned.traverse((child) => {
+      if (child.isMesh || child.isGroup) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    return cloned;
+  }
+  
+  /**
+   * Preload model for this item type (called at game startup)
+   * @param {string} itemId - The item type ID to preload
+   * @returns {Promise<void>}
+   */
+  static async preloadModel(itemId) {
+    try {
+      const model = await loadModel(itemId);
+      ItemType._modelCache.set(itemId, model);
+    } catch (error) {
+      console.warn(`Failed to preload model for ${itemId}, will use legacy build method:`, error);
+    }
+  }
+  
+  /**
+   * Preload all models for registered item types
+   * @param {string[]} itemIds - Array of item type IDs to preload
+   * @returns {Promise<void>}
+   */
+  static async preloadAllModels(itemIds) {
+    const promises = itemIds.map(id => ItemType.preloadModel(id));
+    await Promise.all(promises);
+    console.log(`Preloaded ${itemIds.length} item models`);
   }
 
   /**

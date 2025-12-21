@@ -20,7 +20,7 @@ export class Stone extends ItemType {
     return new THREE.Mesh(geometry, material);
   }
 
-  getWorldModel() {
+  _buildWorldModel() {
     const geometry = new THREE.BoxGeometry(0.4, 0.3, 0.4);
     const material = new THREE.MeshStandardMaterial({ 
       color: this.color,

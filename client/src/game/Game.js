@@ -6,6 +6,8 @@ import { SettingsMenu } from '../ui/SettingsMenu.js';
 import { AdminMenu } from '../ui/AdminMenu.js';
 import { VersionWatermark } from '../ui/VersionWatermark.js';
 import { GameState } from './GameState.js';
+import { getItemTypeRegistry } from './ItemTypeRegistry.js';
+import { ItemType } from './items/ItemType.js';
 import { AudioManager } from './AudioManager.js';
 
 export class Game {
@@ -65,6 +67,16 @@ export class Game {
       this.audioManager.loadGameplayMusic(gameplayTracks);
     } catch (e) {
       console.warn('Some audio files could not be loaded:', e);
+    }
+
+    // Preload all item models for better performance
+    try {
+      const registry = getItemTypeRegistry();
+      const allItemTypes = registry.getAll();
+      const itemIds = allItemTypes.map(item => item.getId());
+      await ItemType.preloadAllModels(itemIds);
+    } catch (e) {
+      console.warn('Some models could not be preloaded, will use legacy build methods:', e);
     }
 
     // Show loading screen

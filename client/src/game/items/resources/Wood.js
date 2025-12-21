@@ -20,7 +20,7 @@ export class Wood extends ItemType {
     return new THREE.Mesh(geometry, material);
   }
 
-  getWorldModel() {
+  _buildWorldModel() {
     const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.5);
     const material = new THREE.MeshStandardMaterial({ 
       color: this.color,

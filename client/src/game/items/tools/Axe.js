@@ -58,7 +58,7 @@ export class Axe extends ItemType {
     return axeGroup;
   }
 
-  getWorldModel() {
+  _buildWorldModel() {
     const axeGroup = new THREE.Group();
     
     // Wooden handle (warm light brown, elongated and slightly curved)

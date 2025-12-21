@@ -22,20 +22,20 @@ export class Stick extends ItemType {
       flatShading: true
     });
     const stickBody = new THREE.Mesh(stickBodyGeometry, stickMaterial);
-    stickBody.rotation.z = Math.PI / 2;
+    stickBody.rotation.x = Math.PI / 2;
     stickGroup.add(stickBody);
     
     // Small branch
     const branchGeometry = new THREE.CylinderGeometry(0.0525 * scale, 0.0525 * scale, 0.35 * scale, 6);
     const branch = new THREE.Mesh(branchGeometry, stickMaterial);
-    branch.rotation.z = Math.PI / 4;
+    branch.rotation.x = Math.PI / 2 + Math.PI / 6;
     branch.position.set(-0.2625 * scale, 0.14 * scale, 0);
     stickGroup.add(branch);
     
     return stickGroup;
   }
 
-  getWorldModel() {
+  _buildWorldModel() {
     const stickGroup = new THREE.Group();
     
     // Main stick body (cylindrical, low-poly) - 75% bigger
@@ -47,7 +47,7 @@ export class Stick extends ItemType {
       flatShading: true
     });
     const mainBody = new THREE.Mesh(mainBodyGeometry, stickMaterial);
-    mainBody.rotation.z = Math.PI / 2; // Rotate to be horizontal
+    mainBody.rotation.z = Math.PI / 2; // Rotate to be horizontal (lie flat along X axis)
     mainBody.position.y = 0.0875;
     mainBody.castShadow = true;
     mainBody.receiveShadow = true;
@@ -56,7 +56,7 @@ export class Stick extends ItemType {
     // Small branch - 75% bigger
     const branchGeometry = new THREE.CylinderGeometry(0.0525, 0.0525, 0.35, 6);
     const branch = new THREE.Mesh(branchGeometry, stickMaterial);
-    branch.rotation.z = Math.PI / 4; // Angle the branch
+    branch.rotation.z = Math.PI / 2 + Math.PI / 6; // Horizontal with slight angle
     branch.position.set(-0.2625, 0.14, 0);
     branch.castShadow = true;
     branch.receiveShadow = true;
@@ -91,7 +91,7 @@ export class Stick extends ItemType {
     
     const branchGeometry = new THREE.CylinderGeometry(0.0525 * scale, 0.0525 * scale, 0.35 * scale, 6);
     const branch = new THREE.Mesh(branchGeometry, stickMaterial);
-    branch.rotation.z = Math.PI / 4;
+    branch.rotation.z = Math.PI / 2 + Math.PI / 6;
     branch.position.set(-0.2625 * scale, 0.14 * scale, 0);
     stickGroup.add(branch);
     

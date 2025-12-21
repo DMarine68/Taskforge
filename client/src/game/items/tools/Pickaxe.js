@@ -59,7 +59,7 @@ export class Pickaxe extends ItemType {
     return pickaxeGroup;
   }
 
-  getWorldModel() {
+  _buildWorldModel() {
     const pickaxeGroup = new THREE.Group();
     
     // Wooden handle
