@@ -1,33 +1,22 @@
-export class SettingsMenu {
-  constructor(container, tileGrid = null) {
+export class MainMenuSettings {
+  constructor(container) {
     this.container = container;
-    this.tileGrid = tileGrid;
     this.element = null;
-    this.gridVisible = true; // Default to visible
     this.onCloseCallback = null;
     this.create();
   }
 
   create() {
     this.element = document.createElement('div');
-    this.element.id = 'settings-menu';
+    this.element.id = 'main-menu-settings';
     this.element.innerHTML = `
       <div class="settings-background"></div>
       <div class="settings-content">
         <h2 class="settings-title">Settings</h2>
         <div class="settings-options">
-          ${this.tileGrid ? `
           <div class="settings-option">
-            <label class="settings-label">
-              <input type="checkbox" id="grid-toggle" ${this.gridVisible ? 'checked' : ''}>
-              <span class="checkbox-label">Show Grid</span>
-            </label>
+            <p class="settings-info">Main menu settings will be available here.</p>
           </div>
-          ` : `
-          <div class="settings-option">
-            <p class="settings-info">Game settings will be available after starting a game.</p>
-          </div>
-          `}
         </div>
         <div class="settings-buttons">
           <button class="settings-button" id="close-settings-button">Close</button>
@@ -38,7 +27,7 @@ export class SettingsMenu {
     // Add styles
     const style = document.createElement('style');
     style.textContent = `
-      #settings-menu {
+      #main-menu-settings {
         position: fixed;
         top: 0;
         left: 0;
@@ -47,11 +36,11 @@ export class SettingsMenu {
         display: none;
         justify-content: center;
         align-items: center;
-        z-index: 4000;
+        z-index: 5000;
         backdrop-filter: blur(8px);
       }
 
-      #settings-menu.visible {
+      #main-menu-settings.visible {
         display: flex;
       }
 
@@ -119,35 +108,6 @@ export class SettingsMenu {
 
       .settings-option {
         width: 100%;
-      }
-
-      .settings-label {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: #1a1a1a !important;
-        font-size: 18px;
-        cursor: pointer;
-        user-select: none;
-        font-family: 'Arial', sans-serif;
-        font-weight: 600;
-      }
-
-      .settings-label * {
-        color: #1a1a1a !important;
-      }
-
-      .settings-label input[type="checkbox"] {
-        width: 20px;
-        height: 20px;
-        cursor: pointer;
-        accent-color: #34495e;
-      }
-
-      .checkbox-label {
-        color: #1a1a1a !important;
-        font-family: 'Arial', sans-serif;
-        font-weight: 600;
       }
 
       .settings-info {
@@ -231,15 +191,7 @@ export class SettingsMenu {
   }
 
   setupEventListeners() {
-    const gridToggle = this.element.querySelector('#grid-toggle');
     const closeButton = this.element.querySelector('#close-settings-button');
-
-    if (gridToggle) {
-      gridToggle.addEventListener('change', (e) => {
-        this.gridVisible = e.target.checked;
-        this.updateGridVisibility();
-      });
-    }
 
     closeButton.addEventListener('click', () => {
       this.hide();
@@ -247,37 +199,6 @@ export class SettingsMenu {
         this.onCloseCallback();
       }
     });
-  }
-
-  setTileGrid(tileGrid) {
-    this.tileGrid = tileGrid;
-    // Update the UI if settings menu is already created
-    if (this.element && tileGrid) {
-      const settingsOptions = this.element.querySelector('.settings-options');
-      if (settingsOptions && !settingsOptions.querySelector('#grid-toggle')) {
-        settingsOptions.innerHTML = `
-          <div class="settings-option">
-            <label class="settings-label" style="color: #1a1a1a !important;">
-              <input type="checkbox" id="grid-toggle" ${this.gridVisible ? 'checked' : ''}>
-              <span class="checkbox-label" style="color: #1a1a1a !important;">Show Grid</span>
-            </label>
-          </div>
-        `;
-        const gridToggle = this.element.querySelector('#grid-toggle');
-        if (gridToggle) {
-          gridToggle.addEventListener('change', (e) => {
-            this.gridVisible = e.target.checked;
-            this.updateGridVisibility();
-          });
-        }
-      }
-    }
-  }
-
-  updateGridVisibility() {
-    if (this.tileGrid && this.tileGrid.gridHelper) {
-      this.tileGrid.gridHelper.visible = this.gridVisible;
-    }
   }
 
   show() {

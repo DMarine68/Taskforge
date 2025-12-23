@@ -40,7 +40,6 @@ export class CreditsMenu {
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.85);
         display: none;
         justify-content: center;
         align-items: center;
@@ -59,7 +58,14 @@ export class CreditsMenu {
         width: 100%;
         height: 100%;
         background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 50%, #87CEEB 100%);
-        opacity: 0.3;
+        background-size: 100% 200%;
+        animation: skyShift 20s ease infinite;
+        opacity: 0.85;
+      }
+
+      @keyframes skyShift {
+        0%, 100% { background-position: 0% 0%; }
+        50% { background-position: 0% 100%; }
       }
 
       .credits-content {
@@ -88,7 +94,7 @@ export class CreditsMenu {
       }
 
       .credits-title {
-        color: #2c3e50;
+        color: #1a1a1a;
         font-size: 42px;
         margin: 0 0 40px 0;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
@@ -103,7 +109,7 @@ export class CreditsMenu {
       }
 
       .credits-section-title {
-        color: #34495e;
+        color: #1a1a1a;
         font-size: 18px;
         margin: 0 0 12px 0;
         font-family: 'Arial', sans-serif;
@@ -114,7 +120,7 @@ export class CreditsMenu {
       }
 
       .credits-name {
-        color: #2c3e50;
+        color: #1a1a1a;
         font-size: 28px;
         margin: 0;
         font-family: 'Arial', sans-serif;
@@ -122,26 +128,27 @@ export class CreditsMenu {
       }
 
       .credits-text {
-        color: #2c3e50;
+        color: #1a1a1a;
         font-size: 22px;
         margin: 0;
         font-family: 'Arial', sans-serif;
       }
 
       .credits-link {
-        color: #3498db;
+        color: #1a1a1a;
         font-size: 20px;
         margin: 0;
         font-family: 'Arial', sans-serif;
-        text-decoration: none;
+        text-decoration: underline;
         display: inline-block;
         transition: all 0.2s ease;
         border-bottom: 2px solid transparent;
+        font-weight: 600;
       }
 
       .credits-link:hover {
-        color: #2980b9;
-        border-bottom-color: #2980b9;
+        color: #34495e;
+        border-bottom-color: #34495e;
         transform: translateY(-1px);
       }
 
@@ -156,7 +163,7 @@ export class CreditsMenu {
         background: rgba(255, 255, 255, 0.95);
         border: 3px solid #34495e;
         border-radius: 8px;
-        color: #2c3e50;
+        color: #1a1a1a;
         font-size: 18px;
         padding: 12px 40px;
         min-width: 150px;
