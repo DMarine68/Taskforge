@@ -5,7 +5,27 @@ export class SettingsMenu {
     this.element = null;
     this.gridVisible = true; // Default to visible
     this.onCloseCallback = null;
+    this.loadSettings(); // Load saved settings
     this.create();
+  }
+
+  loadSettings() {
+    try {
+      const saved = localStorage.getItem('taskforge_gridVisible');
+      if (saved !== null) {
+        this.gridVisible = saved === 'true';
+      }
+    } catch (error) {
+      console.warn('Failed to load grid visibility setting:', error);
+    }
+  }
+
+  saveSettings() {
+    try {
+      localStorage.setItem('taskforge_gridVisible', this.gridVisible.toString());
+    } catch (error) {
+      console.warn('Failed to save grid visibility setting:', error);
+    }
   }
 
   create() {
@@ -18,10 +38,10 @@ export class SettingsMenu {
         <div class="settings-options">
           ${this.tileGrid ? `
           <div class="settings-option">
-            <label class="settings-label">
-              <input type="checkbox" id="grid-toggle" ${this.gridVisible ? 'checked' : ''}>
-              <span class="checkbox-label">Show Grid</span>
-            </label>
+            <label class="settings-label">Show Grid</label>
+            <button class="grid-toggle-button ${this.gridVisible ? 'on' : 'off'}" id="grid-toggle">
+              ${this.gridVisible ? 'On' : 'Off'}
+            </button>
           </div>
           ` : `
           <div class="settings-option">
@@ -122,32 +142,78 @@ export class SettingsMenu {
       }
 
       .settings-label {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+        display: block;
         color: #1a1a1a !important;
         font-size: 18px;
-        cursor: pointer;
-        user-select: none;
+        margin-bottom: 12px;
         font-family: 'Arial', sans-serif;
         font-weight: 600;
       }
 
-      .settings-label * {
-        color: #1a1a1a !important;
-      }
-
-      .settings-label input[type="checkbox"] {
-        width: 20px;
-        height: 20px;
+      .grid-toggle-button {
+        position: relative;
+        background: rgba(231, 76, 60, 0.9);
+        border: 3px solid #e74c3c;
+        border-radius: 8px;
+        color: #ffffff;
+        font-size: 18px;
+        padding: 12px 40px;
+        min-width: 100px;
         cursor: pointer;
-        accent-color: #34495e;
-      }
-
-      .checkbox-label {
-        color: #1a1a1a !important;
+        transition: all 0.2s ease;
         font-family: 'Arial', sans-serif;
         font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        overflow: hidden;
+      }
+
+      .grid-toggle-button.on {
+        background: rgba(46, 204, 113, 0.9);
+        border-color: #2ecc71;
+        color: #ffffff;
+      }
+
+      .grid-toggle-button.off {
+        background: rgba(231, 76, 60, 0.9);
+        border-color: #e74c3c;
+        color: #ffffff;
+      }
+
+      .grid-toggle-button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.4s ease;
+      }
+
+      .grid-toggle-button:hover::before {
+        left: 100%;
+      }
+
+      .grid-toggle-button:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+        transform: translateY(-2px);
+      }
+
+      .grid-toggle-button.on:hover {
+        border-color: #27ae60;
+        background: rgba(39, 174, 96, 1);
+      }
+
+      .grid-toggle-button.off:hover {
+        border-color: #c0392b;
+        background: rgba(192, 57, 43, 1);
+      }
+
+      .grid-toggle-button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
       }
 
       .settings-info {
@@ -235,9 +301,11 @@ export class SettingsMenu {
     const closeButton = this.element.querySelector('#close-settings-button');
 
     if (gridToggle) {
-      gridToggle.addEventListener('change', (e) => {
-        this.gridVisible = e.target.checked;
+      gridToggle.addEventListener('click', () => {
+        this.gridVisible = !this.gridVisible;
+        this.updateToggleButton();
         this.updateGridVisibility();
+        this.saveSettings();
       });
     }
 
@@ -249,6 +317,14 @@ export class SettingsMenu {
     });
   }
 
+  updateToggleButton() {
+    const gridToggle = this.element.querySelector('#grid-toggle');
+    if (gridToggle) {
+      gridToggle.textContent = this.gridVisible ? 'On' : 'Off';
+      gridToggle.className = `grid-toggle-button ${this.gridVisible ? 'on' : 'off'}`;
+    }
+  }
+
   setTileGrid(tileGrid) {
     this.tileGrid = tileGrid;
     // Update the UI if settings menu is already created
@@ -257,21 +333,25 @@ export class SettingsMenu {
       if (settingsOptions && !settingsOptions.querySelector('#grid-toggle')) {
         settingsOptions.innerHTML = `
           <div class="settings-option">
-            <label class="settings-label" style="color: #1a1a1a !important;">
-              <input type="checkbox" id="grid-toggle" ${this.gridVisible ? 'checked' : ''}>
-              <span class="checkbox-label" style="color: #1a1a1a !important;">Show Grid</span>
-            </label>
+            <label class="settings-label">Show Grid</label>
+            <button class="grid-toggle-button ${this.gridVisible ? 'on' : 'off'}" id="grid-toggle">
+              ${this.gridVisible ? 'On' : 'Off'}
+            </button>
           </div>
         `;
         const gridToggle = this.element.querySelector('#grid-toggle');
         if (gridToggle) {
-          gridToggle.addEventListener('change', (e) => {
-            this.gridVisible = e.target.checked;
+          gridToggle.addEventListener('click', () => {
+            this.gridVisible = !this.gridVisible;
+            this.updateToggleButton();
             this.updateGridVisibility();
+            this.saveSettings();
           });
         }
       }
     }
+    // Apply the saved setting to the grid immediately
+    this.updateGridVisibility();
   }
 
   updateGridVisibility() {
@@ -280,10 +360,20 @@ export class SettingsMenu {
     }
   }
 
+  getGridVisible() {
+    return this.gridVisible;
+  }
+
   show() {
     if (!this.element.parentNode) {
       this.container.appendChild(this.element);
     }
+    // Reload settings in case they were changed elsewhere
+    this.loadSettings();
+    // Update toggle button to reflect current state
+    this.updateToggleButton();
+    // Apply the setting to the grid
+    this.updateGridVisibility();
     this.element.classList.add('visible');
   }
 
