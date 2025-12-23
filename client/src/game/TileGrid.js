@@ -148,8 +148,12 @@ export class TileGrid {
 
   // Convert world coordinates to tile coordinates (snaps to nearest tile)
   worldToTile(worldX, worldZ) {
-    const tileX = Math.floor(worldX / this.tileSize + this.width / 2);
-    const tileZ = Math.floor(worldZ / this.tileSize + this.height / 2);
+    // Convert to tile index space (can be fractional)
+    const tileIndexX = worldX / this.tileSize + this.width / 2;
+    const tileIndexZ = worldZ / this.tileSize + this.height / 2;
+    // Round to nearest integer tile
+    const tileX = Math.round(tileIndexX);
+    const tileZ = Math.round(tileIndexZ);
     return { tileX, tileZ };
   }
 
