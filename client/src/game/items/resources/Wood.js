@@ -15,7 +15,7 @@ export class Wood extends ItemType {
   }
 
   getHandPosition() {
-    return [0, 0.4, 0.4]; // Logs are held with 2 hands (centered, in front of player)
+    return [0, 0.5, 0.15]; // Logs are held with 2 hands (centered, in front of player)
   }
 
   canAddToInventory(inventoryInfo) {
