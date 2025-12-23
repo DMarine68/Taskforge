@@ -5,8 +5,7 @@ export class MainMenu {
     this.audioManager = audioManager;
     this.element = null;
     this.onPlayCallback = null;
-    this.onLoadGameCallback = null;
-    this.onMultiplayerCallback = null;
+    this.onResumeLastSaveCallback = null;
     this.onAchievementsCallback = null;
     this.onSettingsCallback = null;
     this.onCreditsCallback = null;
@@ -28,11 +27,8 @@ export class MainMenu {
             <button class="menu-button primary" id="play-button">
               <span class="button-text">Play</span>
             </button>
-            <button class="menu-button primary" id="load-game-button">
-              <span class="button-text">Load Game</span>
-            </button>
-            <button class="menu-button primary" id="multiplayer-button">
-              <span class="button-text">Multiplayer</span>
+            <button class="menu-button primary resume-button" id="resume-last-save-button">
+              <span class="button-text">Resume Last Save</span>
             </button>
           </div>
           <div class="menu-button-group secondary-actions">
@@ -62,8 +58,8 @@ export class MainMenu {
         position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         z-index: 2000;
         transition: opacity 0.3s ease-out;
         overflow: hidden;
@@ -78,8 +74,8 @@ export class MainMenu {
         position: absolute;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 50%, #87CEEB 100%);
         background-size: 100% 200%;
         animation: skyShift 20s ease infinite;
@@ -95,8 +91,8 @@ export class MainMenu {
         position: absolute;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         background: 
           radial-gradient(circle at 20% 30%, rgba(135, 206, 235, 0.3) 0%, transparent 50%),
           radial-gradient(circle at 80% 70%, rgba(176, 224, 230, 0.3) 0%, transparent 50%),
@@ -120,16 +116,19 @@ export class MainMenu {
         z-index: 1;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
         align-items: center;
-        width: 100%;
-        height: 100%;
-        padding: 40px;
+        width: 100vw;
+        min-height: 100vh;
+        padding: clamp(20px, 3vh, 40px);
+        padding-top: clamp(30px, 5vh, 60px);
         text-align: center;
+        box-sizing: border-box;
+        overflow-y: auto;
       }
 
       .menu-logo {
-        margin-bottom: 60px;
+        margin-bottom: clamp(30px, 4vh, 60px);
         animation: fadeInDown 0.8s ease-out;
       }
 
@@ -145,8 +144,8 @@ export class MainMenu {
       }
 
       .logo-image {
-        max-width: 500px;
-        max-height: 250px;
+        max-width: min(500px, 35vw);
+        max-height: min(250px, 18vh);
         filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.3));
         animation: logoFloat 4s ease-in-out infinite;
       }
@@ -158,18 +157,18 @@ export class MainMenu {
 
       .logo-text {
         color: #2c3e50;
-        font-size: 72px;
+        font-size: clamp(36px, 5vw, 72px);
         margin: 0;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
         font-family: 'Arial', sans-serif;
         font-weight: bold;
-        letter-spacing: 4px;
+        letter-spacing: clamp(2px, 0.3vw, 4px);
       }
 
       .menu-buttons-container {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: clamp(10px, 1.5vh, 16px);
         align-items: center;
         width: 100%;
         max-width: 320px;
@@ -190,22 +189,22 @@ export class MainMenu {
       .menu-button-group {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: clamp(8px, 1vh, 12px);
         width: 100%;
         align-items: center;
       }
 
       .menu-button-group.primary-actions {
-        margin-bottom: 8px;
+        margin-bottom: clamp(4px, 0.5vh, 8px);
       }
 
       .menu-button-group.secondary-actions {
-        margin-bottom: 8px;
+        margin-bottom: clamp(4px, 0.5vh, 8px);
       }
 
       .menu-button-group.exit-actions {
-        margin-top: 16px;
-        padding-top: 16px;
+        margin-top: clamp(10px, 1.5vh, 16px);
+        padding-top: clamp(10px, 1.5vh, 16px);
         border-top: 2px solid rgba(44, 62, 80, 0.2);
       }
 
@@ -262,6 +261,10 @@ export class MainMenu {
         background: rgba(255, 255, 255, 0.98);
       }
 
+      .menu-button.primary.resume-button {
+        font-size: 18px;
+      }
+
       .menu-button.secondary {
         font-size: 18px;
         padding: 12px 40px;
@@ -286,6 +289,50 @@ export class MainMenu {
         position: relative;
         z-index: 1;
       }
+
+      /* Media queries for very small viewports */
+      @media (max-height: 600px) {
+        .menu-logo {
+          margin-bottom: clamp(15px, 2vh, 30px);
+        }
+
+        .logo-image {
+          max-width: min(300px, 30vw);
+          max-height: min(150px, 15vh);
+        }
+
+        .logo-text {
+          font-size: clamp(28px, 4vw, 48px);
+        }
+
+        .menu-buttons-container {
+          gap: clamp(6px, 1vh, 12px);
+        }
+
+        .menu-button {
+          padding: clamp(8px, 1vh, 12px) clamp(20px, 3vw, 30px);
+          font-size: clamp(14px, 2vw, 18px);
+        }
+
+        .menu-button.primary {
+          font-size: clamp(16px, 2.2vw, 20px);
+          padding: clamp(10px, 1.2vh, 14px) clamp(25px, 3.5vw, 35px);
+        }
+
+        .menu-button.primary.resume-button {
+          font-size: clamp(14px, 2vw, 16px);
+        }
+
+        .menu-button.secondary {
+          font-size: clamp(14px, 2vw, 16px);
+          padding: clamp(8px, 1vh, 10px) clamp(20px, 3vw, 30px);
+        }
+
+        .menu-button.exit {
+          font-size: clamp(12px, 1.8vw, 14px);
+          padding: clamp(6px, 0.8vh, 8px) clamp(18px, 2.5vw, 25px);
+        }
+      }
     `;
     document.head.appendChild(style);
 
@@ -294,8 +341,7 @@ export class MainMenu {
 
   setupEventListeners() {
     const playButton = this.element.querySelector('#play-button');
-    const loadGameButton = this.element.querySelector('#load-game-button');
-    const multiplayerButton = this.element.querySelector('#multiplayer-button');
+    const resumeLastSaveButton = this.element.querySelector('#resume-last-save-button');
     const achievementsButton = this.element.querySelector('#achievements-button');
     const settingsButton = this.element.querySelector('#settings-button');
     const creditsButton = this.element.querySelector('#credits-button');
@@ -307,15 +353,9 @@ export class MainMenu {
       }
     });
 
-    loadGameButton.addEventListener('click', () => {
-      if (this.onLoadGameCallback) {
-        this.onLoadGameCallback();
-      }
-    });
-
-    multiplayerButton.addEventListener('click', () => {
-      if (this.onMultiplayerCallback) {
-        this.onMultiplayerCallback();
+    resumeLastSaveButton.addEventListener('click', () => {
+      if (this.onResumeLastSaveCallback) {
+        this.onResumeLastSaveCallback();
       }
     });
 
@@ -373,12 +413,8 @@ export class MainMenu {
     this.onPlayCallback = callback;
   }
 
-  onLoadGame(callback) {
-    this.onLoadGameCallback = callback;
-  }
-
-  onMultiplayer(callback) {
-    this.onMultiplayerCallback = callback;
+  onResumeLastSave(callback) {
+    this.onResumeLastSaveCallback = callback;
   }
 
   onAchievements(callback) {
